@@ -1,0 +1,38 @@
+version: '3.8'
+services:
+  node-backend:
+    build: ./backend
+    ports: 
+      - '4000:4000'
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE=${SUPABASE_SERVICE_ROLE}
+      - ML_SERVICE_URL=http://ml-service:8000
+    depends_on:
+      - ml-service
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  frontend:
+    build: ./frontend
+    ports: 
+      - '3000:3000'
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - NEXT_PUBLIC_API_URL=http://localhost:4000
+    depends_on:
+      - node-backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+
+  ml-service:
+    build: ./ml
+    ports: 
+      - '8000:8000'
+    command: uvicorn ml_service:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./ml:/app
