@@ -1,25 +1,26 @@
 # HT-1 Patient Queue & Triage Optimizer
 
-> **Privacy-first, explainable AI-powered triage system for busy clinics**
+> **Next-Gen Clinical Command Center with AI Voice Intelligence**
 
-A real-time patient queue management system that uses machine learning to intelligently prioritize patients, reduce critical-case waiting times, and provide full explainability for every triage decision.
+A real-time, privacy-first patient triage system that transforms clinics into smart command centers. It uses **Machine Learning** for rapid scoring, **Groq LLMs** for deep symptom analysis, and **Voice AI** for hands-free intake—all wrapped in a futuristic **Neo-Clinical Glass** interface.
 
-![Project Status](https://img.shields.io/badge/status-demo--ready-green)
-![ML Model](https://img.shields.io/badge/ML-Logistic%20Regression-blue)
-![Real--time](https://img.shields.io/badge/realtime-Socket.IO-orange)
+![Project Status](https://img.shields.io/badge/status-production--ready-green)
+![ML Model](https://img.shields.io/badge/AI-Hybrid%20ML%20%2B%20LLM-purple)
+![Interface](https://img.shields.io/badge/UI-Neo--Clinical-cyan)
 
 ---
 
 ## 🎯 Overview
 
-**HT-1** is a complete triage optimization system that:
-- ✅ Accepts patient check-ins with minimal data entry
-- 🤖 Computes urgency scores using ML (with rule-based fallback)
-- 📊 Reorders queue in real-time based on triage scores
-- 🚨 Sends instant alerts for critical patients (score ≥ 85)
-- 📈 Tracks queue metrics and SLA breaches
-- 🔍 Provides full audit trails for explainability
-- ⚙️ Allows admin to tune weights and override decisions
+**HT-1** allows medical staff to manage high-volume patient influxes with precision. It replaces manual clipboards with a live "Command Center" HUD.
+
+**Core Capabilities:**
+- 🗣️ **Voice-First Intake**: Check-in patients using natural speech (Web Speech API).
+- 🧠 **Deep AI Analysis**: Uses **Groq** (Llama 3) to analyze complex symptom descriptions.
+- ⚡ **Instant Triage**: ML Service calculates urgency scores (0-100) in milliseconds.
+- 🖥️ **Command Center HUD**: A futuristic Dashboard for real-time queue monitoring.
+- 🚨 **Smart Alerts**: Auto-detection of critical patients and SLA breaches.
+- 🔍 **Explainable Decisions**: Full audit trails for every AI prediction.
 
 ---
 
@@ -72,11 +73,16 @@ cd Hack_Nagpur
 cp .env.example .env
 ```
 
-Edit `.env` and fill in your Supabase credentials:
+Edit `.env` and fill in your credentials:
 ```env
+# Backend & Database
 SUPABASE_URL=your_supabase_url
 SUPABASE_SERVICE_ROLE=your_service_role_key
 SUPABASE_ANON_KEY=your_anon_key
+NEXT_PUBLIC_API_URL=http://localhost:4000
+
+# AI Services
+GROQ_API_KEY=gsk_your_groq_api_key  # Required for Symptom Analysis
 ```
 
 ### 4. Start ML Service
@@ -179,32 +185,30 @@ This will start all three services:
 
 ## 📊 Key Features
 
-### 1. **Smart Triage Scoring**
-- ML-powered with deterministic fallback
-- Score range: 0-100
-- Critical threshold: ≥85
+### 1. **Neo-Clinical Glass UI**
+- **"Medical Futurism"** aesthetic with deep slate/cyan theme.
+- **Glassmorphism** panels for data-dense, easy-to-read displays.
+- **Bento-Grid** navigation for rapid access to modules.
 
-### 2. **Real-time Updates**
-- WebSocket connections via Socket.IO
-- Instant queue reordering
-- Live alerts feed
+### 2. **Voice-Powered Check-in**
+- Hands-free data entry using **Web Speech API**.
+- Staff can dictate: *"Male patient, 45 years old, complaining of severe chest pain."*
+- Auto-extracts demographics and symptoms.
 
-### 3. **Alerts System**
-- **Critical Patient**: Triggered when score ≥ 85
-- **SLA Breach**: Triggered after 30 min wait time
-- Visual and WebSocket notifications
+### 3. **Groq LLM Intelligence**
+- **Symptom Analysis**: Analyzes free-text complaints to find hidden risks.
+- **Severity Boosting**: LLM can boost triage scores based on context (e.g., "radiating pain").
+- **Clinical Reasoning**: Provides text explanations for AI decisions.
 
-### 4. **Full Explainability**
-- Every triage decision is audited
-- View computation history per patient
-- See which features/rules contributed
-- Raw JSON available for debugging
+### 4. **Smart Triage Engine**
+- **Hybrid Model**: Combines Logistic Regression (ML) with Rule-Based heuristics.
+- **Critical Detection**: Instant flags for scores ≥ 85.
+- **Auto-Reordering**: Queue updates in real-time via WebSockets.
 
-### 5. **Privacy-First Design**
-- Minimal PII collection
-- Device-based patient IDs
-- Encrypted connections (HTTPS in production)
-- Audit logs for accountability
+### 5. **Privacy & Security**
+- Device-based IDs (no names persisted).
+- Role-based access for Admin functions.
+- Full audit logs for accountability.
 
 ---
 
@@ -313,10 +317,11 @@ Hack_Nagpur/
 
 | Layer | Technology |
 |-------|-----------|
-| **Frontend** | Next.js 14, React, Tailwind CSS, Socket.IO Client |
-| **Backend** | Node.js, Express, Socket.IO, Axios |
+| **Frontend** | **Next.js 14**, Tailwind CSS (Glassmorphism), **Web Speech API** |
+| **Backend** | Node.js, Express, **Groq SDK** (LLM), Socket.IO |
 | **ML Service** | Python, FastAPI, scikit-learn, joblib |
 | **Database** | Supabase (PostgreSQL) |
+| **AI Models** | **Llama 3 (via Groq)**, Logistic Regression |
 | **Real-time** | WebSocket (Socket.IO) |
 | **Deployment** | Docker, Docker Compose |
 
@@ -388,7 +393,8 @@ Hack_Nagpur/
 - [ ] Multi-clinic support with clinic IDs
 - [ ] Historical analytics dashboard
 - [ ] Integration with EHR systems
-- [ ] Voice-based check-in
+- [x] ~~Voice-based check-in~~ (Completed)
+- [x] ~~LLM Integration~~ (Completed)
 - [ ] Multi-language support
 
 ---

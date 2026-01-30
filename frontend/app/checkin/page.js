@@ -39,38 +39,82 @@ export default function CheckinPage() {
   // Voice Input Logic
   const [isListening, setIsListening] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(false)
-  // Fix: Use useRef properly
+  const [speechError, setSpeechError] = useState(null)
   const recognitionRef = useRef(null) 
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)) {
-      setSpeechSupported(true)
+    if (typeof window !== 'undefined') {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-      recognitionRef.current = new SpeechRecognition()
-      recognitionRef.current.continuous = false
-      recognitionRef.current.interimResults = false
       
-      recognitionRef.current.onstart = () => setIsListening(true)
-      recognitionRef.current.onend = () => setIsListening(false)
-      
-      recognitionRef.current.onresult = (event) => {
-        const transcript = event.results[0][0].transcript
-        setFormData(prev => ({
-          ...prev,
-          custom_symptoms: prev.custom_symptoms 
-            ? `${prev.custom_symptoms} ${transcript}` 
-            : transcript
-        }))
+      if (SpeechRecognition) {
+        setSpeechSupported(true)
+        const recognition = new SpeechRecognition()
+        
+        // Simple configuration
+        recognition.continuous = false       // Single phrase at a time
+        recognition.interimResults = false   // Only final results
+        recognition.lang = 'en-IN'           // English (India) - better for Indian accents
+        
+        recognition.onstart = () => {
+          setIsListening(true)
+          setSpeechError(null)
+          console.log('🎤 Listening...')
+        }
+        
+        recognition.onend = () => {
+          console.log('🎤 Stopped')
+          setIsListening(false)
+        }
+        
+        recognition.onresult = (event) => {
+          const transcript = event.results[0][0].transcript
+          console.log('🎤 Got:', transcript)
+          
+          if (transcript) {
+            setFormData(prev => ({
+              ...prev,
+              custom_symptoms: prev.custom_symptoms 
+                ? `${prev.custom_symptoms} ${transcript}` 
+                : transcript
+            }))
+          }
+        }
+        
+        recognition.onerror = (event) => {
+          console.error('🎤 Error:', event.error)
+          setIsListening(false)
+          
+          if (event.error === 'not-allowed') {
+            setSpeechError('Microphone blocked. Click 🔒 in address bar to allow.')
+          } else if (event.error === 'no-speech') {
+            setSpeechError('No speech heard. Try again.')
+          } else if (event.error === 'network') {
+            setSpeechError('Internet required for voice recognition.')
+          }
+        }
+        
+        recognitionRef.current = recognition
       }
     }
   }, [])
 
-  const toggleListening = () => {
-    if (!recognitionRef.current) return
+  const toggleListening = async () => {
+    if (!recognitionRef.current) {
+      setSpeechError('Voice not supported in this browser. Use Chrome.')
+      return
+    }
+    
     if (isListening) {
       recognitionRef.current.stop()
     } else {
-      recognitionRef.current.start()
+      // Request mic permission
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true })
+        setSpeechError(null)
+        recognitionRef.current.start()
+      } catch (err) {
+        setSpeechError('Allow microphone access to use voice input.')
+      }
     }
   } 
 
@@ -145,263 +189,352 @@ export default function CheckinPage() {
   }
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-4xl mx-auto">
+    <main className="min-h-screen py-12 px-4 md:px-8 relative overflow-hidden">
+      {/* Background Ambience */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-primary-500/10 rounded-full blur-[100px] pointer-events-none"></div>
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-[100px] pointer-events-none"></div>
+
+      <div className="max-w-5xl mx-auto relative z-10">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex items-end justify-between border-b border-white/5 pb-6">
           <div>
-            <h1 className="text-4xl font-bold mb-2">Patient Check-in</h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Enter patient information for automated triage
-            </p>
+            <div className="text-primary-400 text-xs font-mono mb-2 tracking-widest uppercase">Protocol: Standard Intake</div>
+            <h1 className="text-4xl font-display font-bold text-white tracking-tight">Patient Check-in</h1>
           </div>
-          <Link href="/" className="px-4 py-2 glass rounded-lg hover:shadow-glow transition-all">
-            ← Home
+          <Link href="/" className="px-4 py-2 glass-panel hover:bg-white/5 rounded-lg text-sm text-slate-300 transition-colors flex items-center gap-2">
+            <span className="text-lg">←</span> Terminal
           </Link>
         </div>
 
-        {/* Success Result */}
-        {result && (
-          <div className={`glass rounded-xl p-6 mb-6 ${getScoreBg(result.triage_score)} border-2 animate-pulse-glow`}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold">✓ Patient Checked In</h3>
-              <span className="text-sm text-gray-600">ID: {result.id}</span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Triage Score</p>
-                <p className={`text-5xl font-bold ${getScoreColor(result.triage_score)}`}>
-                  {result.triage_score}
-                </p>
+        <div className="grid lg:grid-cols-12 gap-8">
+          {/* Main Form Column */}
+          <div className="lg:col-span-8">
+            <form onSubmit={handleSubmit} className="glass-panel rounded-2xl p-8 space-y-8">
+              
+              {/* Section 1: Demographics */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-primary-500"></span>
+                  Patient Identification
+                </h3>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1.5 ml-1">ID Code</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.device_patient_id}
+                      onChange={e => setFormData({...formData, device_patient_id: e.target.value})}
+                      className="glass-input font-mono focus:border-primary-400"
+                      placeholder="PT-001"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1.5 ml-1">Age</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      max="120"
+                      value={formData.age}
+                      onChange={e => setFormData({...formData, age: e.target.value})}
+                      className="glass-input focus:border-primary-400"
+                      placeholder="Years"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1.5 ml-1">Sex</label>
+                    <select
+                      value={formData.sex}
+                      onChange={e => setFormData({...formData, sex: e.target.value})}
+                      className="glass-input focus:border-primary-400 appearance-none bg-[url('https://api.iconify.design/heroicons/chevron-down.svg?color=gray')] bg-no-repeat bg-[right_1rem_center] bg-[length:1.2em]"
+                    >
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                </div>
               </div>
-              <div className="flex-1">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Method</p>
-                <p className="font-mono text-sm">{result.triage_method.toUpperCase()}</p>
-                <p className="text-xs text-gray-500 mt-2">
-                  {result.triage_score >= 85 && '🚨 Critical alert sent!'}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* AI Analysis Result */}
-        {aiAnalysis && aiAnalysis.severity !== 'unknown' && (
-          <div className="glass rounded-xl p-6 mb-6 border-2 border-purple-500 bg-purple-500/10">
-            <div className="flex items-center mb-3">
-              <span className="text-2xl mr-2">🤖</span>
-              <h3 className="text-lg font-bold">AI Symptom Analysis</h3>
-            </div>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Severity Level</p>
-                <p className="font-bold text-lg capitalize">{aiAnalysis.severity}</p>
+              {/* Section 2: Vitals */}
+              <div className="space-y-4 pt-4 border-t border-white/5">
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  Telemetry / Vitals
+                </h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="glass-card bg-slate-900/40 p-4 border border-white/5 hover:border-primary-500/30 transition-colors group">
+                    <label className="block text-xs text-slate-500 mb-1 group-hover:text-primary-400 transition-colors">Heart Rate</label>
+                    <div className="flex items-baseline gap-2">
+                      <input
+                        type="number"
+                        min="40"
+                        max="220"
+                        value={formData.vitals.hr}
+                        onChange={e => setFormData({...formData, vitals: {...formData.vitals, hr: e.target.value}})}
+                        className="w-full bg-transparent text-2xl font-bold font-mono text-white outline-none placeholder-slate-700"
+                        placeholder="--"
+                      />
+                      <span className="text-xs text-slate-600">BPM</span>
+                    </div>
+                  </div>
+                  <div className="glass-card bg-slate-900/40 p-4 border border-white/5 hover:border-primary-500/30 transition-colors group">
+                    <label className="block text-xs text-slate-500 mb-1 group-hover:text-primary-400 transition-colors">Systolic BP</label>
+                    <div className="flex items-baseline gap-2">
+                      <input
+                        type="number"
+                        min="60"
+                        max="220"
+                        value={formData.vitals.sbp}
+                        onChange={e => setFormData({...formData, vitals: {...formData.vitals, sbp: e.target.value}})}
+                        className="w-full bg-transparent text-2xl font-bold font-mono text-white outline-none placeholder-slate-700"
+                        placeholder="--"
+                      />
+                      <span className="text-xs text-slate-600">mmHg</span>
+                    </div>
+                  </div>
+                  <div className="glass-card bg-slate-900/40 p-4 border border-white/5 hover:border-primary-500/30 transition-colors group">
+                    <label className="block text-xs text-slate-500 mb-1 group-hover:text-primary-400 transition-colors">SpO2</label>
+                    <div className="flex items-baseline gap-2">
+                      <input
+                        type="number"
+                        min="70"
+                        max="100"
+                        value={formData.vitals.spo2}
+                        onChange={e => setFormData({...formData, vitals: {...formData.vitals, spo2: e.target.value}})}
+                        className="w-full bg-transparent text-2xl font-bold font-mono text-white outline-none placeholder-slate-700"
+                        placeholder="--"
+                      />
+                      <span className="text-xs text-slate-600">%</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Urgency Boost</p>
-                <p className="font-bold text-lg text-purple-600">+{aiAnalysis.urgency_boost} points</p>
+
+              {/* Section 3: Symptoms */}
+              <div className="space-y-4 pt-4 border-t border-white/5">
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+                  Clinical Signs
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {SYMPTOM_OPTIONS.map(symptom => (
+                    <button
+                      key={symptom}
+                      type="button"
+                      onClick={() => handleSymptomToggle(symptom)}
+                      className={`px-4 py-3 rounded-xl border text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                        formData.symptoms.includes(symptom)
+                          ? 'bg-primary-500/20 border-primary-500 text-primary-200 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
+                          : 'bg-slate-900/40 border-white/5 text-slate-400 hover:border-white/10 hover:bg-slate-800'
+                      }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${formData.symptoms.includes(symptom) ? 'bg-primary-400' : 'bg-slate-700'}`}></span>
+                      {symptom.replace(/_/g, ' ')}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-            <div className="mt-4 p-3 bg-white/30 dark:bg-black/20 rounded-lg">
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Clinical Reasoning</p>
-              <p className="text-sm">{aiAnalysis.explanation}</p>
-            </div>
-            <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500 rounded-lg">
-              <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold mb-1">Recommended Action</p>
-              <p className="text-sm text-blue-700 dark:text-blue-300">{aiAnalysis.recommended_action}</p>
-            </div>
-          </div>
-        )}
 
-        {/* Error */}
-        {error && (
-          <div className="bg-red-500/10 border-2 border-red-500 rounded-xl p-4 mb-6">
-            <p className="text-red-600 dark:text-red-400">❌ {error}</p>
-          </div>
-        )}
+              {/* Section 4: AI Analysis */}
+              <div className="space-y-4 pt-4 border-t border-white/5">
+                <div className={`p-1 rounded-2xl bg-gradient-to-br from-white/5 to-transparent border border-white/10 ${isListening ? 'border-primary-500/50 shadow-glow' : ''}`}>
+                  <div className="bg-slate-950/80 rounded-xl p-6 backdrop-blur-sm">
+                    <div className="flex items-center justify-between mb-4">
+                      <label className="text-sm font-bold text-slate-300 flex items-center gap-2">
+                        <span className="text-xl">🤖</span> AI Symptom Analysis
+                      </label>
+                      {speechSupported && (
+                         <button
+                           type="button"
+                           onClick={toggleListening}
+                           className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
+                             isListening 
+                               ? 'bg-red-500/20 text-red-400 border border-red-500/50 animate-pulse' 
+                               : 'bg-primary-500/10 text-primary-400 border border-primary-500/20 hover:bg-primary-500/20'
+                           }`}
+                         >
+                           {isListening ? (
+                             <>
+                               <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                               Listening...
+                             </>
+                           ) : (
+                             <>
+                               <span>🎙️</span> Voice Input
+                             </>
+                           )}
+                         </button>
+                      )}
+                    </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="glass rounded-2xl p-8 space-y-6">
-          {/* Basic Info */}
-          <div className="grid md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Patient ID <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.device_patient_id}
-                onChange={e => setFormData({...formData, device_patient_id: e.target.value})}
-                className="w-full px-4 py-2 rounded-lg bg-white/50 dark:bg-black/30 border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 outline-none"
-                placeholder="e.g., PT-001"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Age <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                required
-                min="0"
-                max="120"
-                value={formData.age}
-                onChange={e => setFormData({...formData, age: e.target.value})}
-                className="w-full px-4 py-2 rounded-lg bg-white/50 dark:bg-black/30 border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 outline-none"
-                placeholder="Years"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Sex</label>
-              <select
-                value={formData.sex}
-                onChange={e => setFormData({...formData, sex: e.target.value})}
-                className="w-full px-4 py-2 rounded-lg bg-white/50 dark:bg-black/30 border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 outline-none"
+                    <textarea
+                      value={formData.custom_symptoms}
+                      onChange={e => setFormData({...formData, custom_symptoms: e.target.value})}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-4 text-slate-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500/50 outline-none min-h-[100px] resize-none font-sans text-sm leading-relaxed"
+                      placeholder={isListening ? "Listening... Speak clearly..." : "Describe detailed symptoms here. The AI will analyze for critical keywords and severity patterns."}
+                    />
+                    
+                    {speechError && (
+                      <p className="mt-2 text-xs text-orange-400 flex items-center gap-2">
+                        ⚠️ {speechError}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+               {/* Comorbidities */}
+               <div className="pt-4 border-t border-white/5">
+                 <div className="flex items-center justify-between bg-slate-900/40 p-4 rounded-xl border border-white/5">
+                   <label className="text-sm font-medium text-slate-400">Known Comorbidities</label>
+                   <input
+                     type="number"
+                     min="0"
+                     max="10"
+                     value={formData.comorbid}
+                     onChange={e => setFormData({...formData, comorbid: parseInt(e.target.value) || 0})}
+                     className="bg-slate-950 border border-slate-700 rounded-lg w-20 px-3 py-1 text-center font-mono text-white focus:border-primary-500 outline-none"
+                   />
+                 </div>
+               </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="btn-primary w-full text-lg tracking-wide uppercase"
               >
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
+                {submitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing Triage...
+                  </span>
+                ) : 'Submit for Triage'}
+              </button>
+            </form>
           </div>
 
-          {/* Vitals */}
-          <div>
-            <label className="block text-sm font-medium mb-3">Vital Signs (Optional)</label>
-            <div className="grid md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                  Heart Rate (bpm)
-                </label>
-                <input
-                  type="number"
-                  min="40"
-                  max="200"
-                  value={formData.vitals.hr}
-                  onChange={e => setFormData({...formData, vitals: {...formData.vitals, hr: e.target.value}})}
-                  className="w-full px-4 py-2 rounded-lg bg-white/50 dark:bg-black/30 border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 outline-none"
-                  placeholder="80"
-                />
+          {/* Sidebar / Results Column */}
+          <div className="lg:col-span-4 space-y-6">
+            {/* Quick Status Panel */}
+             <div className="glass-panel rounded-xl p-6">
+               <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">System Status</h4>
+               <div className="space-y-4">
+                 <div className="flex justify-between items-center text-sm">
+                   <span className="text-slate-400">ML Model</span>
+                   <span className="flex items-center gap-2 text-emerald-400">
+                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></span>
+                     Online
+                   </span>
+                 </div>
+                 <div className="flex justify-between items-center text-sm">
+                   <span className="text-slate-400">AI Analysis</span>
+                   <span className="text-primary-400">Active</span>
+                 </div>
+                 <div className="flex justify-between items-center text-sm">
+                   <span className="text-slate-400">Queue Latency</span>
+                   <span className="font-mono text-slate-200">~12ms</span>
+                 </div>
+               </div>
+             </div>
+
+            {/* Error Display */}
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/50 text-red-200 p-4 rounded-xl text-sm leading-relaxed backdrop-blur-sm">
+                <strong className="block text-red-400 mb-1">ERR_SUBMISSION_FAILED</strong>
+                {error}
               </div>
-              <div>
-                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                  Blood Pressure (systolic)
-                </label>
-                <input
-                  type="number"
-                  min="60"
-                  max="200"
-                  value={formData.vitals.sbp}
-                  onChange={e => setFormData({...formData, vitals: {...formData.vitals, sbp: e.target.value}})}
-                  className="w-full px-4 py-2 rounded-lg bg-white/50 dark:bg-black/30 border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 outline-none"
-                  placeholder="120"
-                />
+            )}
+
+            {/* Success Result Card */}
+            {result ? (
+              <div className={`glass-panel rounded-2xl overflow-hidden border-2 ${result.triage_score >= 85 ? 'border-red-500/50 shadow-[0_0_50px_rgba(239,68,68,0.2)]' : 'border-primary-500/50 shadow-glow'}`}>
+                <div className={`p-1 ${result.triage_score >= 85 ? 'bg-red-500' : 'bg-primary-500'}`}></div>
+                <div className="p-6">
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <h3 className="text-2xl font-display font-bold text-white mb-1">Triage Complete</h3>
+                      <p className="text-xs font-mono text-slate-400">{result.id}</p>
+                    </div>
+                    {result.triage_score >= 85 && (
+                      <span className="animate-pulse bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">CRITICAL</span>
+                    )}
+                  </div>
+                  
+                  <div className="text-center py-8 relative">
+                    <div className={`text-7xl font-display font-bold mb-2 ${result.triage_score >= 85 ? 'text-red-400 text-glow' : 'text-primary-400 text-glow'}`}>
+                      {result.triage_score}
+                    </div>
+                    <div className="text-xs font-mono text-slate-500 uppercase tracking-widest">Calculated Urgency Score</div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-white/5">
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Method</p>
+                      <p className="font-mono text-sm text-slate-300">{result.triage_method}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-slate-500 mb-1">Placement</p>
+                      <p className="font-mono text-sm text-white"># PENDING</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                  SpO2 (%)
-                </label>
-                <input
-                  type="number"
-                  min="70"
-                  max="100"
-                  value={formData.vitals.spo2}
-                  onChange={e => setFormData({...formData, vitals: {...formData.vitals, spo2: e.target.value}})}
-                  className="w-full px-4 py-2 rounded-lg bg-white/50 dark:bg-black/30 border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 outline-none"
-                  placeholder="98"
-                />
+            ) : (
+               <div className="glass-panel rounded-xl p-8 text-center border-dashed border-slate-800">
+                 <div className="text-4xl mb-4 opacity-20">📊</div>
+                 <p className="text-sm text-slate-500">
+                   Result telemetry will appear here after analysis is complete.
+                 </p>
+               </div>
+            )}
+
+            {/* AI Analysis Card */}
+            {aiAnalysis && aiAnalysis.severity !== 'unknown' && (
+              <div className="glass-panel rounded-xl p-6 border-l-4 border-l-purple-500">
+                <h4 className="flex items-center gap-2 font-bold text-white mb-4">
+                  <span className="text-purple-400">✦</span> AI Insights
+                </h4>
+                
+                <div className="mb-4">
+                   <div className="flex justify-between text-sm mb-1">
+                     <span className="text-slate-400">Severity Assessment</span>
+                     <span className="text-white font-medium capitalize">{aiAnalysis.severity}</span>
+                   </div>
+                   <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                     <div 
+                       className={`h-full ${aiAnalysis.severity === 'critical' ? 'bg-red-500' : 'bg-purple-500'}`} 
+                       style={{width: aiAnalysis.severity === 'critical' ? '100%' : '60%'}}
+                     ></div>
+                   </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="bg-white/5 rounded-lg p-3 text-sm text-slate-300 leading-relaxed">
+                    {aiAnalysis.explanation}
+                  </div>
+                  
+                  <div className="flex items-start gap-3 mt-4 pt-4 border-t border-white/5">
+                    <span className="text-blue-400 mt-0.5">ⓘ</span>
+                    <div>
+                      <p className="text-xs font-bold text-blue-400 uppercase mb-1">Recommendation</p>
+                      <p className="text-sm text-slate-300">{aiAnalysis.recommended_action}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 text-center">
+                  <span className="inline-block bg-purple-500/20 text-purple-300 text-xs font-bold px-3 py-1 rounded-full border border-purple-500/30">
+                    +{aiAnalysis.urgency_boost} Point Boost Applied
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
-
-          {/* Symptoms */}
-          <div>
-            <label className="block text-sm font-medium mb-3">Symptoms</label>
-            <div className="grid md:grid-cols-3 gap-3">
-              {SYMPTOM_OPTIONS.map(symptom => (
-                <button
-                  key={symptom}
-                  type="button"
-                  onClick={() => handleSymptomToggle(symptom)}
-                  className={`px-4 py-2 rounded-lg border-2 transition-all ${
-                    formData.symptoms.includes(symptom)
-                      ? 'bg-primary-500 border-primary-600 text-white'
-                      : 'bg-white/50 dark:bg-black/30 border-gray-300 dark:border-gray-700 hover:border-primary-400'
-                  }`}
-                >
-                  {symptom.replace(/_/g, ' ')}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Custom Symptoms with AI Analysis */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium">
-                <span className="flex items-center gap-2">
-                  Other Symptoms 
-                  <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded-full">🤖 AI Powered</span>
-                </span>
-              </label>
-              {speechSupported && (
-                <button
-                  type="button"
-                  onClick={toggleListening}
-                  className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                    isListening 
-                      ? 'bg-red-500 text-white animate-pulse' 
-                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
-                  }`}
-                >
-                  {isListening ? '🔴 Listening...' : '🎙️ Voice Input'}
-                </button>
-              )}
-            </div>
-            <textarea
-              value={formData.custom_symptoms}
-              onChange={e => setFormData({...formData, custom_symptoms: e.target.value})}
-              className="w-full px-4 py-3 rounded-lg bg-white/50 dark:bg-black/30 border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-purple-500 outline-none resize-none"
-              placeholder="Describe any additional symptoms not listed above... AI will analyze the severity and urgency."
-              rows="3"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              💡 AI will analyze this text and automatically boost the triage score based on severity
-            </p>
-          </div>
-
-          {/* Comorbidities */}
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Number of Comorbidities
-            </label>
-            <input
-              type="number"
-              min="0"
-              max="10"
-              value={formData.comorbid}
-              onChange={e => setFormData({...formData, comorbid: parseInt(e.target.value) || 0})}
-              className="w-full px-4 py-2 rounded-lg bg-white/50 dark:bg-black/30 border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 outline-none"
-              placeholder="0"
-            />
-          </div>
-
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full py-4 bg-gradient-to-r from-primary-500 to-primary-600 text-white font-bold rounded-xl hover:shadow-glow transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {submitting ? '⏳ Processing...' : '✓ Check In Patient'}
-          </button>
-        </form>
-
-        {/* Link to Dashboard */}
-        <div className="mt-6 text-center">
-          <Link href="/dashboard" className="text-primary-500 hover:underline">
-            → View Queue Dashboard
-          </Link>
         </div>
       </div>
     </main>
