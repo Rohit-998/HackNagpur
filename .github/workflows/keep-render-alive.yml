@@ -1,0 +1,26 @@
+name: Keep Render Services Alive
+
+on:
+  schedule:
+    # Run every 10 minutes (Render free tier sleeps after 15 min of inactivity)
+    - cron: '*/10 * * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping ML Service
+        run: |
+          echo "Pinging ML Service..."
+          curl -f ${{ secrets.ML_SERVICE_URL }}/health || echo "ML service ping failed"
+          
+      - name: Ping Backend Service
+        run: |
+          echo "Pinging Backend Service..."
+          curl -f ${{ secrets.BACKEND_URL }}/health || echo "Backend ping failed"
+          
+      - name: Keep-alive complete
+        run: |
+          echo "✅ Keep-alive pings sent at $(date)"
