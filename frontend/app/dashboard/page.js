@@ -1,17 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import Link from 'next/link'
 import { useRealtime } from '@/components/RealtimeProvider'
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { Activity, FolderOpen, Bot, AlertCircle, FileText, Bell, Siren, Monitor, LogOut, ArrowRight, ArrowLeft } from 'lucide-react'
+import { AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, Legend, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import VitalsRecheckModal from '@/components/VitalsRecheckModal'
 
 export default function DashboardPage() {
   const [queue, setQueue] = useState([])
   const [stats, setStats] = useState({})
+  const [analytics, setAnalytics] = useState(null)
   const [alerts, setAlerts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [pagination, setPagination] = useState({ page: 1, total_pages: 1 })
+  const pageRef = useRef(1)
   const [selectedPatient, setSelectedPatient] = useState(null)
   const { socket, connected } = useRealtime()
 
@@ -19,14 +23,25 @@ export default function DashboardPage() {
 
   const fetchQueue = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/queue`)
+      const response = await axios.get(`${API_URL}/api/queue`, {
+         params: { page: pageRef.current }
+      })
       setQueue(response.data.patients || [])
       setStats(response.data.stats || {})
+      setPagination(prev => ({ ...prev, ...response.data.pagination }))
     } catch (error) {
       console.error('Failed to fetch queue:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  const changePage = (newPage) => {
+    if (newPage < 1 || newPage > pagination.total_pages) return
+    pageRef.current = newPage
+    setPagination(prev => ({ ...prev, page: newPage }))
+    setLoading(true)
+    fetchQueue()
   }
 
   const fetchAlerts = async () => {
@@ -38,9 +53,19 @@ export default function DashboardPage() {
     }
   }
 
+  const fetchAnalytics = async () => {
+    try {
+      const { data } = await axios.get(`${API_URL}/api/analytics`)
+      setAnalytics(data)
+    } catch (e) {
+      console.error('Analytics fetch error', e)
+    }
+  }
+
   useEffect(() => {
     fetchQueue()
     fetchAlerts()
+    fetchAnalytics()
   }, [])
 
   useEffect(() => {
@@ -105,7 +130,7 @@ export default function DashboardPage() {
     <main className="min-h-screen py-8 px-4 md:px-8 relative overflow-hidden">
       <div className="max-w-[1600px] mx-auto">
         {/* Header */}
-        <div className="mb-8 flex items-end justify-between border-b border-white/5 pb-6">
+        <div className="mb-6 md:mb-8 flex flex-col md:flex-row items-start md:items-end justify-between border-b border-white/5 pb-6 gap-4 md:gap-0">
           <div>
             <div className="flex items-center gap-3 mb-2">
               <div className={`flex items-center gap-2 px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${connected ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
@@ -114,17 +139,20 @@ export default function DashboardPage() {
               </div>
               <span className="text-slate-500 text-xs font-mono">WS_LATENCY: 12ms</span>
             </div>
-            <h1 className="text-3xl font-display font-bold text-white tracking-tight">Command Center</h1>
+            <h1 className="text-2xl md:text-3xl font-display font-bold text-white tracking-tight">Command Center</h1>
           </div>
-          <div className="flex items-center gap-3">
-            <Link href="/" className="px-4 py-2 glass-panel hover:bg-white/5 rounded-lg text-sm text-slate-300 transition-colors">
+          <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+            <Link href="/" className="px-3 md:px-4 py-2 glass-panel hover:bg-white/5 rounded-lg text-sm text-slate-300 transition-colors whitespace-nowrap">
               Terminal
             </Link>
-            <Link href="/patients" className="px-4 py-2 glass-panel hover:bg-white/5 rounded-lg text-sm text-slate-300 transition-colors flex items-center gap-2">
-              📂 Records
+            <Link href="/treatment" className="px-3 md:px-4 py-2 glass-panel hover:bg-emerald-500/10 hover:border-emerald-500/20 rounded-lg text-sm text-emerald-400 font-bold transition-all flex items-center gap-2 whitespace-nowrap">
+              <Activity size={16} /> <span className="hidden sm:inline">Active Care</span>
             </Link>
-            <Link href="/checkin" className="btn-primary flex items-center gap-2 px-4 py-2 text-sm">
-              <span className="text-lg">+</span> Intake
+            <Link href="/patients" className="px-3 md:px-4 py-2 glass-panel hover:bg-white/5 rounded-lg text-sm text-slate-300 transition-colors flex items-center gap-2 whitespace-nowrap">
+              <FolderOpen size={16} /> <span className="hidden sm:inline">Records</span>
+            </Link>
+            <Link href="/checkin" className="btn-primary flex items-center gap-2 px-3 md:px-4 py-2 text-sm whitespace-nowrap">
+              <span className="text-lg">+</span> <span className="hidden sm:inline">Intake</span>
             </Link>
           </div>
         </div>
@@ -154,12 +182,70 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Analytics Row */}
+        {analytics && (
+          <div className="grid md:grid-cols-2 gap-4 mb-8">
+            <div className="glass-panel p-5 rounded-xl">
+              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Acuity Distribution (24h)</h3>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Critical', value: analytics.acuity.critical, color: '#ef4444' },
+                        { name: 'High', value: analytics.acuity.high, color: '#f97316' },
+                        { name: 'Medium', value: analytics.acuity.medium, color: '#eab308' },
+                        { name: 'Low', value: analytics.acuity.low, color: '#22c55e' }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {[
+                        { name: 'Critical', value: analytics.acuity.critical, color: '#ef4444' },
+                        { name: 'High', value: analytics.acuity.high, color: '#f97316' },
+                        { name: 'Medium', value: analytics.acuity.medium, color: '#eab308' },
+                        { name: 'Low', value: analytics.acuity.low, color: '#22c55e' }
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{backgroundColor: '#0f172a', borderColor: '#334155'}} itemStyle={{color: '#fff'}} />
+                    <Legend iconSize={8} iconType="circle" wrapperStyle={{fontSize: '10px', paddingTop: '10px'}} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            
+            <div className="glass-panel p-5 rounded-xl">
+              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Top Presenting Symptoms</h3>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analytics.top_symptoms} layout="vertical" margin={{left: 10, right: 10}}>
+                    <XAxis type="number" hide />
+                    <YAxis type="category" dataKey="name" width={100} tick={{fontSize: 10, fill: '#94a3b8'}} interval={0} />
+                    <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{backgroundColor: '#0f172a', borderColor: '#334155'}} itemStyle={{color: '#fff'}} />
+                    <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={16}>
+                       {analytics.top_symptoms.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={`hsl(${210 + index * 10}, 80%, 60%)`} />
+                       ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid lg:grid-cols-12 gap-6">
           {/* Main Queue List */}
           <div className="lg:col-span-8 space-y-6">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                <span className="text-primary-400">❖</span> Active Triage Queue
+                <Activity size={20} className="text-primary-400" /> Active Triage Queue
               </h2>
               <span suppressHydrationWarning className="text-xs text-slate-500 font-mono">UPDATED: {new Date().toLocaleTimeString()}</span>
             </div>
@@ -195,7 +281,7 @@ export default function DashboardPage() {
 
                       {/* Content */}
                       <div className="flex-1 p-5">
-                        <div className="flex items-start justify-between mb-3">
+                        <div className="flex flex-col md:flex-row items-start md:justify-between mb-3">
                           <div>
                             <div className="flex items-center gap-3 mb-1">
                               <span className="font-mono text-lg font-bold text-white tracking-wide">{patient.full_name}</span>
@@ -212,7 +298,7 @@ export default function DashboardPage() {
                               <span className="text-slate-600 ml-2">WAIT:</span> <span suppressHydrationWarning className="text-white">{getWaitTime(patient.arrival_ts)} min</span>
                             </div>
                           </div>
-                          <div className="text-right">
+                          <div className="text-left md:text-right mt-2 md:mt-0">
                             <div className="text-[10px] text-slate-500 uppercase">Analysis Method</div>
                             <div className="font-mono text-xs text-primary-400">{patient.triage_method}</div>
                           </div>
@@ -227,16 +313,16 @@ export default function DashboardPage() {
                           ))}
                         {patient.custom_symptoms && (
                            <span className="px-2 py-1 bg-purple-500/10 border border-purple-500/20 rounded text-[10px] text-purple-300 uppercase tracking-wide flex items-center gap-1">
-                             <span>🤖</span> AI Note
+                             <Bot size={12} /> AI Note
                            </span>
                         )}
                       </div>
 
                       {/* Actions */}
-                      <div className="flex gap-3 opacity-60 group-hover:opacity-100 transition-opacity">
+                      <div className="flex flex-col md:flex-row gap-2 md:gap-3 opacity-100 md:opacity-60 group-hover:opacity-100 transition-opacity mt-4 md:mt-0">
                          <button
                             onClick={() => setSelectedPatient(patient)}
-                            className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-wider rounded border border-blue-500/20 transition-all flex-[0.5] flex items-center justify-center gap-2"
+                            className="px-4 py-3 md:py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-wider rounded border border-blue-500/20 transition-all w-full md:w-auto md:flex-[0.5] flex items-center justify-center gap-2"
                          >
                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -245,18 +331,18 @@ export default function DashboardPage() {
                          </button>
                          <button
                             onClick={() => handleStatusChange(patient.id, 'in_treatment')}
-                            className="px-4 py-2 bg-primary-500/10 hover:bg-primary-500/20 text-primary-400 text-xs font-bold uppercase tracking-wider rounded border border-primary-500/20 transition-all flex-1"
+                            className="px-4 py-3 md:py-2 bg-primary-500/10 hover:bg-primary-500/20 text-primary-400 text-xs font-bold uppercase tracking-wider rounded border border-primary-500/20 transition-all w-full md:w-auto md:flex-1"
                          >
                            Initiate Care
                          </button>
                          <button
                             onClick={() => handleStatusChange(patient.id, 'completed')}
-                            className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider rounded border border-emerald-500/20 transition-all flex-1"
+                            className="px-4 py-3 md:py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider rounded border border-emerald-500/20 transition-all w-full md:w-auto md:flex-1"
                          >
                            Discharge
                          </button>
-                         <Link href={`/audit/${patient.id}`} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-colors" title="Audit Log">
-                           📋
+                         <Link href={`/audit/${patient.id}`} className="px-3 py-3 md:py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-colors flex items-center justify-center w-full md:w-auto" title="Audit Log">
+                           <FileText size={16} />
                          </Link>
                       </div>
                     </div>
@@ -265,6 +351,28 @@ export default function DashboardPage() {
                 })
               )}
             </div>
+            {/* Pagination Controls */}
+            {pagination.total_pages > 1 && (
+              <div className="flex justify-center items-center gap-4 py-4 glass-panel rounded-lg mt-4">
+                <button
+                  onClick={() => changePage(pagination.page - 1)}
+                  disabled={pagination.page <= 1}
+                  className="px-4 py-2 glass rounded-lg text-sm disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+                >
+                  ← Previous
+                </button>
+                <span className="text-slate-400 font-mono text-sm">
+                  Page <span className="text-white font-bold">{pagination.page}</span> of {pagination.total_pages}
+                </span>
+                <button
+                  onClick={() => changePage(pagination.page + 1)}
+                  disabled={pagination.page >= pagination.total_pages}
+                  className="px-4 py-2 glass rounded-lg text-sm disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+                >
+                  Next →
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Sidebar */}

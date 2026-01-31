@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import Link from 'next/link'
+import { ArrowLeft, ChevronLeft, ChevronRight, AlertCircle, Search, FileText } from 'lucide-react'
 import DownloadReportButton from '../../components/DownloadReportButton'
 
 export default function PatientsDirectory() {
@@ -76,8 +77,8 @@ export default function PatientsDirectory() {
              <p className="text-slate-400 mt-1">Search, view history, and download reports</p>
           </div>
           <div className="flex items-center gap-3">
-             <Link href="/dashboard" className="px-4 py-2 glass rounded-lg hover:shadow-glow transition-all text-sm font-bold text-slate-300 hover:text-white border border-white/5">
-                ← Live Dashboard
+             <Link href="/dashboard" className="px-4 py-2 glass rounded-lg hover:shadow-glow transition-all text-sm font-bold text-slate-300 hover:text-white border border-white/5 flex items-center gap-2">
+                <ArrowLeft size={16} /> Live Dashboard
              </Link>
           </div>
         </div>
@@ -169,7 +170,7 @@ export default function PatientsDirectory() {
                            }`}>
                              {patient.triage_score}
                            </span>
-                           {patient.triage_score >= 85 && <span className="animate-pulse">🔴</span>}
+                           {patient.triage_score >= 85 && <AlertCircle size={16} className="text-red-500 animate-pulse" />}
                         </div>
                       </td>
                       <td className="p-4 text-right">
@@ -197,9 +198,9 @@ export default function PatientsDirectory() {
            <button
              disabled={pagination.page <= 1}
              onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-             className="px-4 py-2 glass rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+             className="px-4 py-2 glass rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/10 transition-colors flex items-center gap-2"
            >
-             ← Previous
+             <ChevronLeft size={16} /> Previous
            </button>
            <div className="flex gap-2">
               {Array.from({ length: Math.min(5, pagination.total_pages) }).map((_, i) => {
@@ -215,9 +216,9 @@ export default function PatientsDirectory() {
            <button
              disabled={pagination.page >= pagination.total_pages}
              onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-             className="px-4 py-2 glass rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+             className="px-4 py-2 glass rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/10 transition-colors flex items-center gap-2"
            >
-             Next →
+             Next <ChevronRight size={16} />
            </button>
         </div>
 

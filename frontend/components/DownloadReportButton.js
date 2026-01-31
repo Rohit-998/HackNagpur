@@ -2,7 +2,7 @@ import React from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-const DownloadReportButton = ({ patient, history, alerts }) => {
+const DownloadReportButton = ({ patient, history, alerts, className }) => {
 
   const generatePDF = () => {
     const doc = new jsPDF();
@@ -153,7 +153,7 @@ const DownloadReportButton = ({ patient, history, alerts }) => {
   return (
     <button
       onClick={generatePDF}
-      className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider rounded border border-emerald-500/20 transition-all flex items-center gap-2"
+      className={`px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider rounded border border-emerald-500/20 transition-all flex items-center justify-center gap-2 ${className || ''}`}
     >
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

@@ -9,7 +9,7 @@ export default function Home() {
 
       <div className="max-w-7xl mx-auto px-6 py-24">
         {/* Hero Section */}
-        <div className="text-center mb-24 relative z-10 animate-float">
+        <div className="text-center mb-12 md:mb-24 relative z-10 animate-float">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-500/10 border border-primary-500/20 text-primary-400 text-sm font-medium mb-6">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75"></span>
@@ -18,7 +18,7 @@ export default function Home() {
             HT-1 System Online
           </div>
           
-          <h1 className="text-7xl md:text-8xl font-display font-bold mb-6 tracking-tight text-white leading-tight">
+          <h1 className="text-4xl md:text-7xl lg:text-8xl font-display font-bold mb-6 tracking-tight text-white leading-tight">
             Triage <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-400 to-cyan-200">Intelligence</span>
           </h1>
           

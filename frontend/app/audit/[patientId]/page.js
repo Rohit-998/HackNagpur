@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import Link from 'next/link'
+import { Brain, Bot } from 'lucide-react'
 
 export default function AuditPage({ params }) {
   // In Next.js 14, params is already resolved, no need for use() hook
@@ -47,10 +48,10 @@ export default function AuditPage({ params }) {
   }
 
   return (
-    <main className="min-h-screen p-8">
+    <main className="min-h-screen p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-4xl font-bold mb-2">Triage Audit Trail</h1>
             <p className="text-gray-600 dark:text-gray-400">
@@ -120,7 +121,7 @@ export default function AuditPage({ params }) {
                     <div className="space-y-2 text-sm mb-4 border-b border-white/5 pb-4">
                       <div className="flex justify-between items-center bg-blue-500/10 p-3 rounded-lg border border-blue-500/20">
                         <span className="text-blue-200 font-bold flex items-center gap-2">
-                          <span>🤖</span> ML Confidence
+                          <Bot size={16} /> ML Confidence
                         </span>
                         <span className="font-mono text-xl text-blue-400 font-bold">
                           {(audit.explanation.probability * 100).toFixed(1)}%
@@ -185,7 +186,7 @@ export default function AuditPage({ params }) {
                             {/* Reasoning */}
                             <div>
                               <h5 className="font-bold text-slate-300 mb-1 flex items-center gap-2">
-                                <span>🧠</span> Clinical Reasoning
+                                <Brain size={16} /> Clinical Reasoning
                               </h5>
                               <p className="text-slate-400 leading-relaxed bg-black/20 p-3 rounded-lg border border-white/5">
                                 {reasoning}

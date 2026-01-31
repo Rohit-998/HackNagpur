@@ -203,7 +203,7 @@ export default function CheckinPage() {
 
       <div className="max-w-5xl mx-auto relative z-10">
         {/* Header */}
-        <div className="mb-8 flex items-end justify-between border-b border-white/5 pb-6">
+        <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-end justify-between border-b border-white/5 pb-6 gap-4 md:gap-0">
           <div>
             <div className="text-primary-400 text-xs font-mono mb-2 tracking-widest uppercase">Protocol: Standard Intake</div>
             <h1 className="text-4xl font-display font-bold text-white tracking-tight">Patient Check-in</h1>
@@ -279,7 +279,7 @@ export default function CheckinPage() {
                   <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                   Telemetry / Vitals
                 </h3>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="glass-card bg-slate-900/40 p-4 border border-white/5 hover:border-primary-500/30 transition-colors group">
                     <label className="block text-xs text-slate-500 mb-1 group-hover:text-primary-400 transition-colors">Heart Rate</label>
                     <div className="flex items-baseline gap-2">
