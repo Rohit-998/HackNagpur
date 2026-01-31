@@ -632,6 +632,43 @@ app.get('/api/queue', async (req, res) => {
   }
 });
 
+// Patient Directory with Search & Pagination
+app.get('/api/patients', async (req, res) => {
+  try {
+    const { search, page = 1, limit = 10 } = req.query;
+    const from = (page - 1) * limit;
+    const to = from + parseInt(limit) - 1;
+
+    let query = supabase
+      .from('patients')
+      .select('*', { count: 'exact' })
+      .order('arrival_ts', { ascending: false })
+      .range(from, to);
+
+    if (search) {
+      // search by full_name case-insensitive
+      query = query.ilike('full_name', `%${search}%`);
+    }
+
+    const { data: patients, count, error } = await query;
+
+    if (error) throw error;
+
+    res.json({
+      patients,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: count,
+        total_pages: Math.ceil(count / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Patients fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Update Vitals Endpoint
 app.post('/api/patients/:id/vitals', async (req, res) => {
   try {

@@ -208,8 +208,17 @@ export default function CheckinPage() {
             <div className="text-primary-400 text-xs font-mono mb-2 tracking-widest uppercase">Protocol: Standard Intake</div>
             <h1 className="text-4xl font-display font-bold text-white tracking-tight">Patient Check-in</h1>
           </div>
-          <Link href="/" className="px-4 py-2 glass-panel hover:bg-white/5 rounded-lg text-sm text-slate-300 transition-colors flex items-center gap-2">
-            <span className="text-lg">←</span> Terminal
+          
+          <Link href="/dashboard" className="group flex items-center gap-3 px-5 py-3 glass rounded-xl hover:shadow-glow transition-all border border-white/10 hover:border-primary-500/50">
+            <div className="flex flex-col text-right hidden sm:block">
+              <span className="text-xs text-slate-400 group-hover:text-slate-300">View Active Queue</span>
+              <span className="text-sm font-bold text-white group-hover:text-primary-400">Live Dashboard</span>
+            </div>
+            <div className="w-10 h-10 rounded-lg bg-primary-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <svg className="w-5 h-5 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
           </Link>
         </div>
 

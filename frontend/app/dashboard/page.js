@@ -120,6 +120,9 @@ export default function DashboardPage() {
             <Link href="/" className="px-4 py-2 glass-panel hover:bg-white/5 rounded-lg text-sm text-slate-300 transition-colors">
               Terminal
             </Link>
+            <Link href="/patients" className="px-4 py-2 glass-panel hover:bg-white/5 rounded-lg text-sm text-slate-300 transition-colors flex items-center gap-2">
+              📂 Records
+            </Link>
             <Link href="/checkin" className="btn-primary flex items-center gap-2 px-4 py-2 text-sm">
               <span className="text-lg">+</span> Intake
             </Link>
