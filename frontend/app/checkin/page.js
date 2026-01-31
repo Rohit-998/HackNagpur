@@ -283,7 +283,7 @@ export default function CheckinPage() {
                   <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                   Telemetry / Vitals
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="glass-card bg-slate-900/40 p-4 border border-white/5 hover:border-primary-500/30 transition-colors group">
                     <label className="block text-xs text-slate-500 mb-1 group-hover:text-primary-400 transition-colors">Heart Rate</label>
                     <div className="flex items-baseline gap-2">
@@ -299,7 +299,7 @@ export default function CheckinPage() {
                       <span className="text-xs text-slate-600">BPM</span>
                     </div>
                   </div>
-                  <div className="glass-card bg-slate-900/40 p-4 border border-white/5 hover:border-primary-500/30 transition-colors group">
+                  <div className="glass-card bg-slate-900/40 p-4 border border-white/5 hover:border-primary-500/30 transition-colors group min-w-[140px]">
                     <label className="block text-xs text-slate-500 mb-1 group-hover:text-primary-400 transition-colors">Systolic BP</label>
                     <div className="flex items-baseline gap-2">
                       <input
@@ -308,10 +308,10 @@ export default function CheckinPage() {
                         max="220"
                         value={formData.vitals.sbp}
                         onChange={e => setFormData({...formData, vitals: {...formData.vitals, sbp: e.target.value}})}
-                        className="w-full bg-transparent text-2xl font-bold font-mono text-white outline-none placeholder-slate-700"
+                        className="flex-1 bg-transparent text-2xl font-bold font-mono text-white outline-none placeholder-slate-700"
                         placeholder="--"
                       />
-                      <span className="text-xs text-slate-600">mmHg</span>
+                      <span className="text-xs text-slate-600 whitespace-nowrap">mmHg</span>
                     </div>
                   </div>
                   <div className="glass-card bg-slate-900/40 p-4 border border-white/5 hover:border-primary-500/30 transition-colors group">
