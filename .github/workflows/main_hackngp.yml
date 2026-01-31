@@ -37,22 +37,15 @@ jobs:
           # Use pre-built wheels (faster than building from source)
           pip install --upgrade pip
           pip install --only-binary=:all: -r requirements.txt || pip install -r requirements.txt
-          
-      # Train the ML model during build
-      - name: Train ML model
-        run: |
-          cd ml
-          source antenv/bin/activate
+          # Train model
           python generate_and_train.py
           
-      # Upload only ML directory (exclude venv)
+      # Upload ML directory contents (not the folder itself)
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4
         with:
           name: python-app
-          path: |
-            ml
-            !ml/antenv/
+          path: ml/**  # Upload contents of ml/, not ml/ folder itself
 
   deploy:
     runs-on: ubuntu-latest
