@@ -11,15 +11,47 @@ const axios = require('axios');
 
 const app = express();
 const server = http.createServer(app);
+
+// CORS configuration for production
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  process.env.FRONTEND_URL, // Will be set in production
+];
+
+// Allow Vercel preview deployments
+const corsOptions = {
+  origin: function (origin, callback) {
+
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    }
+    
+    // Allow Vercel preview URLs (*.vercel.app)
+    if (origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+    
+    // Allow Render URLs for testing
+    if (origin.endsWith('.onrender.com')) {
+      return callback(null, true);
+    }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+};
+
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
+  cors: corsOptions
 });
 
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Supabase client

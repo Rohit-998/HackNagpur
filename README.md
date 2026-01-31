@@ -118,6 +118,7 @@ Navigate to `http://localhost:3000` and start using the system!
 
 ---
 
+
 ## 🐳 Docker Deployment
 
 For a simplified deployment, use Docker Compose:
@@ -131,6 +132,34 @@ This will start all three services:
 - Frontend: `http://localhost:3000`
 - Backend: `http://localhost:4000`
 - ML Service: `http://localhost:8000`
+
+---
+
+## ☁️ Free Production Deployment
+
+Deploy your HT-1 system to the cloud **completely FREE** using:
+- **Vercel** (Frontend)
+- **Render.com** (Backend + ML)
+- **Supabase** (Database - already configured!)
+
+📖 **See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for detailed instructions**
+
+Quick start:
+1. **Push code to GitHub**
+2. **Deploy ML Service** to Render.com (~10 min)
+3. **Deploy Backend** to Render.com (~10 min)
+4. **Deploy Frontend** to Vercel (~10 min)
+
+**Total time**: ~30-45 minutes | **Total cost**: $0 🎉
+
+Use the helper script to collect your environment variables:
+```bash
+# Windows
+.\setup-deployment-env.ps1
+
+# Linux/Mac
+./setup-deployment-env.sh
+```
 
 ---
 
