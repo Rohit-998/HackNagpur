@@ -133,22 +133,37 @@ This will start all three services:
 - Backend: `http://localhost:4000`
 - ML Service: `http://localhost:8000`
 
+
 ---
 
 ## ☁️ Free Production Deployment
 
-Deploy your HT-1 system to the cloud **completely FREE** using:
+Deploy your HT-1 system to the cloud **completely FREE**!
+
+### **Deployment Options:**
+
+#### **Option 1: Render.com (Recommended for simplicity)**
 - **Vercel** (Frontend)
 - **Render.com** (Backend + ML)
-- **Supabase** (Database - already configured!)
+- **Supabase** (Database)
 
-📖 **See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for detailed instructions**
+📖 **See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for Render instructions**
 
-Quick start:
-1. **Push code to GitHub**
-2. **Deploy ML Service** to Render.com (~10 min)
-3. **Deploy Backend** to Render.com (~10 min)
-4. **Deploy Frontend** to Vercel (~10 min)
+#### **Option 2: Azure (Recommended for students)**
+- **Vercel** (Frontend)  
+- **Azure App Service** (Backend + ML) - Free F1 tier or $100 student credit
+- **Supabase** (Database)
+
+🔷 **See [AZURE_DEPLOYMENT_GUIDE.md](AZURE_DEPLOYMENT_GUIDE.md) for Azure instructions**
+
+---
+
+### **Quick Start (Both Platforms)**
+
+1. **Push code to GitHub** ✅
+2. **Deploy ML Service** (~10 min)
+3. **Deploy Backend** (~10 min)  
+4. **Deploy Frontend to Vercel** (~10 min)
 
 **Total time**: ~30-45 minutes | **Total cost**: $0 🎉
 

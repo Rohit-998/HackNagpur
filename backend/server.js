@@ -19,10 +19,10 @@ const allowedOrigins = [
   process.env.FRONTEND_URL, // Will be set in production
 ];
 
-// Allow Vercel preview deployments
+// Allow Vercel preview deployments and Azure App Services
 const corsOptions = {
   origin: function (origin, callback) {
-
+    // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
     
     // Check if origin is in allowed list
@@ -37,6 +37,11 @@ const corsOptions = {
     
     // Allow Render URLs for testing
     if (origin.endsWith('.onrender.com')) {
+      return callback(null, true);
+    }
+    
+    // Allow Azure App Service URLs (*.azurewebsites.net)
+    if (origin.endsWith('.azurewebsites.net')) {
       return callback(null, true);
     }
     
