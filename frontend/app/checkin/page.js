@@ -176,16 +176,23 @@ export default function CheckinPage() {
 
   const getScoreColor = (score) => {
     if (score >= 85) return 'text-critical'
-    if (score >= 70) return 'text-high'
-    if (score >= 50) return 'text-medium'
+    if (score >= 50) return 'text-high'
+    if (score >= 25) return 'text-medium'
     return 'text-low'
   }
 
   const getScoreBg = (score) => {
     if (score >= 85) return 'bg-critical/20 border-critical'
-    if (score >= 70) return 'bg-high/20 border-high'
-    if (score >= 50) return 'bg-medium/20 border-medium'
+    if (score >= 50) return 'bg-high/20 border-high'
+    if (score >= 25) return 'bg-medium/20 border-medium'
     return 'bg-low/20 border-low'
+  }
+
+  const getPriorityBadge = (score) => {
+    if (score >= 85) return { text: 'CRITICAL', color: 'bg-red-500', emoji: '🔴' }
+    if (score >= 50) return { text: 'HIGH', color: 'bg-orange-500', emoji: '🟠' }
+    if (score >= 25) return { text: 'MEDIUM', color: 'bg-yellow-500', emoji: '🟡' }
+    return { text: 'LOW', color: 'bg-green-500', emoji: '🟢' }
   }
 
   return (
@@ -460,9 +467,10 @@ export default function CheckinPage() {
                       <h3 className="text-2xl font-display font-bold text-white mb-1">Triage Complete</h3>
                       <p className="text-xs font-mono text-slate-400">{result.id}</p>
                     </div>
-                    {result.triage_score >= 85 && (
-                      <span className="animate-pulse bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">CRITICAL</span>
-                    )}
+                    <span className={`${getPriorityBadge(result.triage_score).color} text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 ${result.triage_score >= 85 ? 'animate-pulse' : ''}`}>
+                      <span>{getPriorityBadge(result.triage_score).emoji}</span>
+                      {getPriorityBadge(result.triage_score).text}
+                    </span>
                   </div>
                   
                   <div className="text-center py-8 relative">
