@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import Link from 'next/link'
 import { useRealtime } from '@/components/RealtimeProvider'
-import { Activity, FolderOpen, Bot, AlertCircle, FileText, Bell, Siren, Monitor, LogOut, ArrowRight, ArrowLeft } from 'lucide-react'
+import { Activity, FolderOpen, Bot, AlertCircle, FileText, Bell, Siren, Monitor, LogOut, ArrowRight, ArrowLeft, TrendingUp } from 'lucide-react'
 import { AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, Legend, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import VitalsRecheckModal from '@/components/VitalsRecheckModal'
 
@@ -147,6 +147,9 @@ export default function DashboardPage() {
             </Link>
             <Link href="/treatment" className="px-3 md:px-4 py-2 glass-panel hover:bg-emerald-500/10 hover:border-emerald-500/20 rounded-lg text-sm text-emerald-400 font-bold transition-all flex items-center gap-2 whitespace-nowrap">
               <Activity size={16} /> <span className="hidden sm:inline">Active Care</span>
+            </Link>
+            <Link href="/volume" className="px-3 md:px-4 py-2 glass-panel hover:bg-purple-500/10 hover:border-purple-500/20 rounded-lg text-sm text-purple-400 font-bold transition-all flex items-center gap-2 whitespace-nowrap">
+              <TrendingUp size={16} /> <span className="hidden sm:inline">Volume</span>
             </Link>
             <Link href="/patients" className="px-3 md:px-4 py-2 glass-panel hover:bg-white/5 rounded-lg text-sm text-slate-300 transition-colors flex items-center gap-2 whitespace-nowrap">
               <FolderOpen size={16} /> <span className="hidden sm:inline">Records</span>

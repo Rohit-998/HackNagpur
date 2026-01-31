@@ -478,6 +478,46 @@ app.get('/api/admin/weights', async (req, res) => {
   }
 });
 
+// Daily Volume Analytics
+app.get('/api/analytics/daily', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('patients')
+      .select('arrival_ts, triage_score')
+      .order('arrival_ts', { ascending: true });
+
+    if (error) throw error;
+
+    const dailyMap = {};
+    
+    data.forEach(p => {
+      const dateObj = new Date(p.arrival_ts);
+      const date = dateObj.toLocaleDateString('en-CA'); 
+      
+      if (!dailyMap[date]) {
+        dailyMap[date] = { 
+          date, 
+          full_date: dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+          weekday: dateObj.toLocaleDateString('en-US', { weekday: 'long' }),
+          total: 0, 
+          critical: 0, 
+          high: 0 
+        };
+      }
+      
+      dailyMap[date].total++;
+      if (p.triage_score >= 85) dailyMap[date].critical++;
+      else if (p.triage_score >= 50) dailyMap[date].high++;
+    });
+
+    const result = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
+    res.json(result);
+  } catch (error) {
+    console.error('Daily analytics error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Socket.IO
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
