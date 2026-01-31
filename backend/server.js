@@ -47,6 +47,10 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 // Fetch active alerts
 app.get('/api/alerts/active', async (req, res) => {
   try {
