@@ -24,15 +24,19 @@ jobs:
       - name: Set up Python version
         uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          python-version: '3.11'  # 3.14 not stable yet, use 3.11
+          cache: 'pip'  # Enable pip caching
+          cache-dependency-path: 'ml/requirements.txt'
 
-      # Build from ML directory
+      # Build from ML directory with caching
       - name: Create virtual environment and install dependencies
         run: |
           cd ml
           python -m venv antenv
           source antenv/bin/activate
-          pip install -r requirements.txt
+          # Use pre-built wheels (faster than building from source)
+          pip install --upgrade pip
+          pip install --only-binary=:all: -r requirements.txt || pip install -r requirements.txt
           
       # Train the ML model during build
       - name: Train ML model

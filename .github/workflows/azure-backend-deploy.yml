@@ -24,11 +24,13 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '18'
+          cache: 'npm'  # Enable npm caching
+          cache-dependency-path: 'backend/package-lock.json'
 
       - name: Install dependencies
         run: |
           cd backend
-          npm install
+          npm ci  # Use 'ci' instead of 'install' for faster, reliable builds
           
       # Optional: Run tests if you have them
       # - name: Run tests
