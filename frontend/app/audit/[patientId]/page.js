@@ -55,7 +55,7 @@ export default function AuditPage({ params }) {
             <h1 className="text-4xl font-bold mb-2">Triage Audit Trail</h1>
             <p className="text-gray-600 dark:text-gray-400">
               Patient ID: {patientId}
-              {patient && ` (${patient.device_patient_id})`}
+              {patient && ` (${patient.full_name})`}
             </p>
           </div>
           <Link href="/dashboard" className="px-4 py-2 glass rounded-lg hover:shadow-glow transition-all">
@@ -115,22 +115,26 @@ export default function AuditPage({ params }) {
                 <div className="bg-white/50 dark:bg-black/30 rounded-lg p-4">
                   <h4 className="font-semibold mb-3 text-sm">Explainability Details</h4>
                   
-                  {audit.method === 'ml' && audit.explanation?.probability !== undefined && (
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">ML Probability:</span>
-                        <span className="font-mono">
+                  {/* ML Details (Show if probability exists, regardless of method tag) */}
+                  {audit.explanation?.probability !== undefined && (
+                    <div className="space-y-2 text-sm mb-4 border-b border-white/5 pb-4">
+                      <div className="flex justify-between items-center bg-blue-500/10 p-3 rounded-lg border border-blue-500/20">
+                        <span className="text-blue-200 font-bold flex items-center gap-2">
+                          <span>🤖</span> ML Confidence
+                        </span>
+                        <span className="font-mono text-xl text-blue-400 font-bold">
                           {(audit.explanation.probability * 100).toFixed(1)}%
                         </span>
                       </div>
+                      
                       {audit.explanation.features_used && (
                         <div className="mt-3">
-                          <p className="text-gray-600 dark:text-gray-400 mb-2">Features Used:</p>
+                          <p className="text-gray-500 uppercase text-[10px] font-bold tracking-wider mb-2">Key Drivers</p>
                           <div className="grid grid-cols-2 gap-2">
                             {Object.entries(audit.explanation.features_used).map(([key, value]) => (
-                              <div key={key} className="flex justify-between text-xs">
-                                <span>{key}:</span>
-                                <span className="font-mono">{value}</span>
+                              <div key={key} className="flex justify-between text-xs bg-white/5 p-2 rounded">
+                                <span className="text-slate-400">{key}:</span>
+                                <span className="font-mono text-slate-200">{value}</span>
                               </div>
                             ))}
                           </div>
@@ -162,6 +166,63 @@ export default function AuditPage({ params }) {
                           </pre>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* AI & AI+ML Explanation */}
+                  {(audit.method.includes('ai') || audit.explanation?.ai_analysis) && (
+                    <div className="space-y-4 text-sm">
+                      {(() => {
+                        const aiData = audit.explanation?.ai_analysis || audit.explanation || {};
+                        const reasoning = aiData.clinical_reasoning || aiData.reasoning || aiData.explanation || "No reasoning provided.";
+                        // Handle actions as array or single string
+                        const rawActions = aiData.recommended_actions || aiData.recommended_action;
+                        const actions = Array.isArray(rawActions) ? rawActions : (rawActions ? [rawActions] : []);
+                        const risks = aiData.risk_factors || [];
+
+                        return (
+                          <>
+                            {/* Reasoning */}
+                            <div>
+                              <h5 className="font-bold text-slate-300 mb-1 flex items-center gap-2">
+                                <span>🧠</span> Clinical Reasoning
+                              </h5>
+                              <p className="text-slate-400 leading-relaxed bg-black/20 p-3 rounded-lg border border-white/5">
+                                {reasoning}
+                              </p>
+                            </div>
+
+                            {/* Risk Factors */}
+                            {risks.length > 0 && (
+                              <div>
+                                <h5 className="font-bold text-slate-300 mb-2">Risk Factors</h5>
+                                <div className="flex flex-wrap gap-2">
+                                  {risks.map((risk, i) => (
+                                    <span key={i} className="px-2 py-1 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded">
+                                      {risk}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Recommended Actions */}
+                            {actions.length > 0 && (
+                              <div>
+                                <h5 className="font-bold text-slate-300 mb-2">Recommended Actions</h5>
+                                <ul className="grid grid-cols-1 gap-2">
+                                  {actions.map((action, i) => (
+                                    <li key={i} className="flex items-start gap-2 text-slate-400 bg-emerald-500/5 p-2 rounded border border-emerald-500/10">
+                                      <span className="text-emerald-500 mt-0.5">✓</span>
+                                      {action}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   )}
 

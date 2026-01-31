@@ -5,12 +5,14 @@ import axios from 'axios'
 import Link from 'next/link'
 import { useRealtime } from '@/components/RealtimeProvider'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import VitalsRecheckModal from '@/components/VitalsRecheckModal'
 
 export default function DashboardPage() {
   const [queue, setQueue] = useState([])
   const [stats, setStats] = useState({})
   const [alerts, setAlerts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [selectedPatient, setSelectedPatient] = useState(null)
   const { socket, connected } = useRealtime()
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
@@ -27,8 +29,18 @@ export default function DashboardPage() {
     }
   }
 
+  const fetchAlerts = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/alerts/active`)
+      setAlerts(response.data || [])
+    } catch (error) {
+      console.error('Failed to fetch alerts:', error)
+    }
+  }
+
   useEffect(() => {
     fetchQueue()
+    fetchAlerts()
   }, [])
 
   useEffect(() => {
@@ -36,6 +48,7 @@ export default function DashboardPage() {
 
     socket.on('queue:update', () => {
       fetchQueue()
+      fetchAlerts()
     })
 
     socket.on('alert:raised', (alert) => {
@@ -72,6 +85,13 @@ export default function DashboardPage() {
     const diffMs = now - arrivalDate
     const mins = Math.floor(diffMs / 60000)
     return mins
+  }
+
+  const getPriorityBadge = (score) => {
+    if (score >= 85) return { text: 'CRITICAL', color: 'bg-red-500', emoji: '🔴', border: 'border-red-500/50', bg_soft: 'bg-red-500/10' }
+    if (score >= 50) return { text: 'HIGH', color: 'bg-orange-500', emoji: '🟠', border: 'border-orange-500/50', bg_soft: 'bg-orange-500/10' }
+    if (score >= 25) return { text: 'MEDIUM', color: 'bg-yellow-500', emoji: '🟡', border: 'border-yellow-500/50', bg_soft: 'bg-yellow-500/10' }
+    return { text: 'LOW', color: 'bg-emerald-500', emoji: '🟢', border: 'border-emerald-500/50', bg_soft: 'bg-emerald-500/10' }
   }
 
   // Chart data - simple mock trend
@@ -138,7 +158,7 @@ export default function DashboardPage() {
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <span className="text-primary-400">❖</span> Active Triage Queue
               </h2>
-              <span className="text-xs text-slate-500 font-mono">UPDATED: {new Date().toLocaleTimeString()}</span>
+              <span suppressHydrationWarning className="text-xs text-slate-500 font-mono">UPDATED: {new Date().toLocaleTimeString()}</span>
             </div>
             
             <div className="space-y-3">
@@ -153,54 +173,55 @@ export default function DashboardPage() {
                   <p className="text-slate-500 font-mono">NO ACTIVE PATIENTS IN QUEUE</p>
                 </div>
               ) : (
-                queue.map((patient, idx) => (
-                  <div
-                    key={patient.id}
-                    className={`glass-card p-0 flex flex-col md:flex-row rounded-xl group ${
-                      patient.triage_score >= 85 
-                        ? 'border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.15)]' 
-                        : 'border-white/5'
-                    }`}
-                  >
-                    {/* Score Strip */}
-                    <div className={`p-4 md:w-24 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-white/5 ${
-                      patient.triage_score >= 85 ? 'bg-red-500/10' : 'bg-slate-900/50'
-                    }`}>
-                      <span className={`text-3xl font-display font-bold ${getScoreColor(patient.triage_score)}`}>
-                        {patient.triage_score}
-                      </span>
-                      <span className="text-[10px] font-mono text-slate-500 uppercase mt-1">Score</span>
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 p-5">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <div className="flex items-center gap-3 mb-1">
-                            <span className="font-mono text-lg font-bold text-white tracking-wide">{patient.device_patient_id}</span>
-                            <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400 font-bold uppercase">{patient.sex} · {patient.age}Y</span>
-                            {patient.triage_score >= 85 && (
-                              <span className="px-2 py-0.5 rounded text-[10px] bg-red-500 text-white font-bold uppercase animate-pulse">Critical</span>
-                            )}
-                          </div>
-                          <div className="text-xs text-slate-400 font-mono">
-                            <span className="text-slate-600">ARRIVED:</span> {new Date(patient.arrival_ts).toLocaleTimeString()} · 
-                            <span className="text-slate-600 ml-2">WAIT:</span> <span className="text-white">{getWaitTime(patient.arrival_ts)} min</span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-[10px] text-slate-500 uppercase">Analysis Method</div>
-                          <div className="font-mono text-xs text-primary-400">{patient.triage_method}</div>
-                        </div>
+                queue.map((patient, idx) => {
+                  const badge = getPriorityBadge(patient.triage_score)
+                  return (
+                    <div
+                      key={patient.id}
+                      className={`glass-card p-0 flex flex-col md:flex-row rounded-xl group border transition-all hover:scale-[1.01] duration-300 ${
+                        badge.border
+                      } ${patient.triage_score >= 85 ? 'shadow-[0_0_20px_rgba(239,68,68,0.15)]' : ''}`}
+                    >
+                      {/* Score Strip */}
+                      <div className={`p-4 md:w-24 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-white/5 ${badge.bg_soft}`}>
+                        <span className={`text-3xl font-display font-bold ${getScoreColor(patient.triage_score)}`}>
+                          {patient.triage_score}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-500 uppercase mt-1">Score</span>
                       </div>
 
-                      {/* Symptoms Tags */}
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {patient.symptoms?.map(s => (
-                          <span key={s} className="px-2 py-1 bg-white/5 border border-white/5 rounded text-[10px] text-slate-300 uppercase tracking-wide">
-                            {s.replace(/_/g, ' ')}
-                          </span>
-                        ))}
+                      {/* Content */}
+                      <div className="flex-1 p-5">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <div className="flex items-center gap-3 mb-1">
+                              <span className="font-mono text-lg font-bold text-white tracking-wide">{patient.full_name}</span>
+                              <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400 font-bold uppercase">{patient.sex} · {patient.age}Y</span>
+                              
+                              {/* Dynamic Priority Badge */}
+                              <span className={`px-2 py-0.5 rounded text-[10px] ${badge.color} text-white font-bold uppercase flex items-center gap-1.5 ${patient.triage_score >= 85 ? 'animate-pulse' : ''}`}>
+                                <span>{badge.emoji}</span>
+                                {badge.text}
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-400 font-mono">
+                              <span className="text-slate-600">ARRIVED:</span> <span suppressHydrationWarning>{new Date(patient.arrival_ts).toLocaleTimeString()}</span> · 
+                              <span className="text-slate-600 ml-2">WAIT:</span> <span suppressHydrationWarning className="text-white">{getWaitTime(patient.arrival_ts)} min</span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[10px] text-slate-500 uppercase">Analysis Method</div>
+                            <div className="font-mono text-xs text-primary-400">{patient.triage_method}</div>
+                          </div>
+                        </div>
+
+                        {/* Symptoms Tags */}
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {patient.symptoms?.map(s => (
+                            <span key={s} className="px-2 py-1 bg-white/5 border border-white/5 rounded text-[10px] text-slate-300 uppercase tracking-wide">
+                              {s.replace(/_/g, ' ')}
+                            </span>
+                          ))}
                         {patient.custom_symptoms && (
                            <span className="px-2 py-1 bg-purple-500/10 border border-purple-500/20 rounded text-[10px] text-purple-300 uppercase tracking-wide flex items-center gap-1">
                              <span>🤖</span> AI Note
@@ -210,6 +231,15 @@ export default function DashboardPage() {
 
                       {/* Actions */}
                       <div className="flex gap-3 opacity-60 group-hover:opacity-100 transition-opacity">
+                         <button
+                            onClick={() => setSelectedPatient(patient)}
+                            className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-wider rounded border border-blue-500/20 transition-all flex-[0.5] flex items-center justify-center gap-2"
+                         >
+                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                           </svg>
+                           Monitor
+                         </button>
                          <button
                             onClick={() => handleStatusChange(patient.id, 'in_treatment')}
                             className="px-4 py-2 bg-primary-500/10 hover:bg-primary-500/20 text-primary-400 text-xs font-bold uppercase tracking-wider rounded border border-primary-500/20 transition-all flex-1"
@@ -228,7 +258,8 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   </div>
-                ))
+                  )
+                })
               )}
             </div>
           </div>
@@ -248,15 +279,26 @@ export default function DashboardPage() {
                   <p className="text-xs text-slate-600 font-mono text-center py-4">NO ACTIVE ALERTS</p>
                 ) : (
                   alerts.map((alert, idx) => (
-                    <div key={idx} className="bg-red-500/5 border-l-2 border-red-500 p-3 rounded-r-lg">
+                    <div key={idx} className={`border-l-2 p-3 rounded-r-lg ${
+                      alert.alert_type === 'deteriorating' ? 'bg-orange-500/5 border-orange-500' :
+                      alert.alert_type === 'critical_vitals' ? 'bg-red-500/5 border-red-500' :
+                      'bg-red-500/5 border-red-500'
+                    }`}>
                       <div className="flex justify-between items-start mb-1">
-                        <span className="text-red-400 text-xs font-bold uppercase">
-                          {alert.alert_type === 'critical_patient' ? 'Critical Triage' : 'SLA Breach'}
+                        <span className={`text-xs font-bold uppercase ${
+                          alert.alert_type === 'deteriorating' ? 'text-orange-400' : 'text-red-400'
+                        }`}>
+                          {alert.alert_type === 'critical_patient' ? 'Critical Triage' :
+                           alert.alert_type === 'critical_vitals' ? 'Critical Vitals' :
+                           alert.alert_type === 'deteriorating' ? 'Deteriorating' :
+                           'Alert'}
                         </span>
-                        <span className="text-[10px] text-slate-600 font-mono">{new Date(alert.timestamp).toLocaleTimeString()}</span>
+                        <span suppressHydrationWarning className="text-[10px] text-slate-600 font-mono">{new Date(alert.timestamp || alert.created_at).toLocaleTimeString()}</span>
                       </div>
                       <p className="text-xs text-slate-300">
-                        Patient #{alert.patient_id} <span className="text-slate-500">·</span> Score {alert.triage_score}
+                        Patient <span className="font-mono font-bold text-white">
+                          {alert.full_name || alert.payload?.full_name || '#' + alert.patient_id}
+                        </span> <span className="text-slate-500">·</span> Score {alert.triage_score || alert.new_score || alert.payload?.triage_score || alert.payload?.new_score || 'N/A'}
                       </p>
                     </div>
                   ))
@@ -309,6 +351,14 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {selectedPatient && (
+        <VitalsRecheckModal
+          patient={selectedPatient}
+          onClose={() => setSelectedPatient(null)}
+          onUpdate={fetchQueue}
+        />
+      )}
     </main>
   )
 }

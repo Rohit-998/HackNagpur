@@ -18,7 +18,7 @@ const SYMPTOM_OPTIONS = [
 
 export default function CheckinPage() {
   const [formData, setFormData] = useState({
-    device_patient_id: '',
+    full_name: '',
     age: '',
     sex: 'other',
     symptoms: [],
@@ -155,7 +155,7 @@ export default function CheckinPage() {
       // Reset form
       setTimeout(() => {
         setFormData({
-          device_patient_id: '',
+          full_name: '',
           age: '',
           sex: 'other',
           symptoms: [],
@@ -226,14 +226,14 @@ export default function CheckinPage() {
                 </h3>
                 <div className="grid md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1.5 ml-1">ID Code</label>
+                    <label className="block text-xs font-medium text-slate-400 mb-1.5 ml-1">Full Name</label>
                     <input
                       type="text"
                       required
-                      value={formData.device_patient_id}
-                      onChange={e => setFormData({...formData, device_patient_id: e.target.value})}
+                      value={formData.full_name}
+                      onChange={e => setFormData({...formData, full_name: e.target.value})}
                       className="glass-input font-mono focus:border-primary-400"
-                      placeholder="PT-001"
+                      placeholder="Rahul Sharma"
                     />
                   </div>
                   <div>

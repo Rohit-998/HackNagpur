@@ -73,6 +73,35 @@ const groq = process.env.GROQ_API_KEY
   : null;
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
+
+// Fetch active alerts (only for waiting patients)
+app.get('/api/alerts/active', async (req, res) => {
+  try {
+    const { data: alerts, error } = await supabase
+      .from('alerts')
+      .select(`
+        *,
+        patient:patients!inner(id, full_name, status)
+      `)
+      .eq('patient.status', 'waiting')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (error) throw error;
+
+    // Flatten structure for frontend
+    const formattedAlerts = alerts.map(a => ({
+      ...a,
+      full_name: a.patient?.full_name
+    }));
+
+    res.json(formattedAlerts);
+  } catch (error) {
+    console.error('Alerts fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 const PORT = process.env.PORT || 4000;
 
 // ============ TRIAGE LOGIC ============
@@ -248,6 +277,183 @@ Respond ONLY with valid JSON.`;
   }
 }
 
+// Critical vitals threshold checker
+function checkCriticalVitals(vitals, age) {
+  const alerts = [];
+  
+  // Dangerously low oxygen - immediate intervention needed
+  if (vitals.spo2 && vitals.spo2 < 90) {
+    alerts.push({
+      type: 'critical_vitals',
+      severity: 'critical',
+      parameter: 'SpO2',
+      value: vitals.spo2,
+      threshold: 90,
+      message: `Critical: SpO2 at ${vitals.spo2}% - Oxygen therapy needed immediately`,
+      action: 'Administer supplemental oxygen and assess respiratory status'
+    });
+  } else if (vitals.spo2 && vitals.spo2 < 94) {
+    alerts.push({
+      type: 'warning_vitals',
+      severity: 'high',
+      parameter: 'SpO2',
+      value: vitals.spo2,
+      threshold: 94,
+      message: `⚠️ Low SpO2: ${vitals.spo2}% - Monitor closely`,
+      action: 'Consider supplemental oxygen, monitor continuously'
+    });
+  }
+  
+  // Dangerous heart rate
+  if (vitals.hr) {
+    if (vitals.hr > 140) {
+      alerts.push({
+        type: 'critical_vitals',
+        severity: 'critical',
+        parameter: 'Heart Rate',
+        value: vitals.hr,
+        threshold: 140,
+        message: `Critical: Severe tachycardia (${vitals.hr} BPM) - Immediate evaluation required`,
+        action: 'Obtain ECG, assess for cardiac causes, consider cardioversion if unstable'
+      });
+    } else if (vitals.hr < 50) {
+      alerts.push({
+        type: 'critical_vitals',
+        severity: 'critical',
+        parameter: 'Heart Rate',
+        value: vitals.hr,
+        threshold: 50,
+        message: `Critical: Severe bradycardia (${vitals.hr} BPM) - Assess immediately`,
+        action: 'Check for hemodynamic compromise, consider atropine/pacing'
+      });
+    } else if (vitals.hr > 120) {
+      alerts.push({
+        type: 'warning_vitals',
+        severity: 'medium',
+        parameter: 'Heart Rate',
+        value: vitals.hr,
+        message: `⚠️ Elevated heart rate: ${vitals.hr} BPM`,
+        action: 'Assess for pain, anxiety, infection, or cardiac causes'
+      });
+    }
+  }
+  
+  // Blood pressure thresholds
+  if (vitals.sbp) {
+    if (vitals.sbp > 180) {
+      alerts.push({
+        type: 'critical_vitals',
+        severity: 'critical',
+        parameter: 'Systolic BP',
+        value: vitals.sbp,
+        threshold: 180,
+        message: `Critical: Hypertensive crisis (${vitals.sbp} mmHg) - Risk of stroke/organ damage`,
+        action: 'Urgent BP reduction, CT brain if symptoms, consider ICU'
+      });
+    } else if (vitals.sbp < 90) {
+      alerts.push({
+        type: 'critical_vitals',
+        severity: 'critical',
+        parameter: 'Systolic BP',
+        value: vitals.sbp,
+        threshold: 90,
+        message: `Critical: Hypotension (${vitals.sbp} mmHg) - Possible shock`,
+        action: 'IV access, fluid resuscitation, assess for bleeding/sepsis'
+      });
+    } else if (vitals.sbp > 160) {
+      alerts.push({
+        type: 'warning_vitals',
+        severity: 'medium',
+        parameter: 'Systolic BP',
+        value: vitals.sbp,
+        message: `⚠️ Elevated BP: ${vitals.sbp} mmHg`,
+        action: 'Monitor BP, check for end-organ damage if symptomatic'
+      });
+    }
+  }
+  
+  return alerts;
+}
+
+// Detect deterioration from vitals history
+function detectDeterioration(vitalsHistory) {
+  if (!vitalsHistory || vitalsHistory.length < 2) return null;
+  
+  const latest = vitalsHistory[vitalsHistory.length - 1];
+  const previous = vitalsHistory[vitalsHistory.length - 2];
+  const alerts = [];
+  
+  // Calculate time difference
+  const timeDiff = new Date(latest.timestamp) - new Date(previous.timestamp);
+  const minutesDiff = Math.round(timeDiff / 60000);
+  
+  // Heart rate trending up significantly
+  if (latest.vitals.hr && previous.vitals.hr) {
+    const hrChange = latest.vitals.hr - previous.vitals.hr;
+    if (hrChange > 20) {
+      alerts.push({
+        type: 'deteriorating',
+        severity: 'high',
+        parameter: 'Heart Rate',
+        message: `⚠️ Rapid HR increase: ${previous.vitals.hr} → ${latest.vitals.hr} BPM (+${hrChange}) in ${minutesDiff} min`,
+        action: 'Reassess patient immediately, check for pain/distress/arrhythmia',
+        trend: 'worsening',
+        change: hrChange
+      });
+    }
+  }
+  
+  // Oxygen saturation dropping
+  if (latest.vitals.spo2 && previous.vitals.spo2) {
+    const spo2Change = previous.vitals.spo2 - latest.vitals.spo2;
+    if (spo2Change > 3) {
+      alerts.push({
+        type: 'deteriorating',
+        severity: 'critical',
+        parameter: 'SpO2',
+        message: `🚨 O2 saturation dropping: ${previous.vitals.spo2}% → ${latest.vitals.spo2}% (-${spo2Change}%) in ${minutesDiff} min`,
+        action: 'Apply/increase oxygen immediately, assess airway and breathing',
+        trend: 'worsening',
+        change: -spo2Change
+      });
+    }
+  }
+  
+  // Blood pressure changes
+  if (latest.vitals.sbp && previous.vitals.sbp) {
+    const sbpChange = latest.vitals.sbp - previous.vitals.sbp;
+    
+    // Rising BP rapidly
+    if (sbpChange > 30) {
+      alerts.push({
+        type: 'deteriorating',
+        severity: 'medium',
+        parameter: 'Blood Pressure',
+        message: `⚠️ BP rising rapidly: ${previous.vitals.sbp} → ${latest.vitals.sbp} mmHg (+${sbpChange}) in ${minutesDiff} min`,
+        action: 'Re-assess for pain, anxiety, or hypertensive emergency',
+        trend: 'worsening',
+        change: sbpChange
+      });
+    }
+    
+    // Dropping BP - shock warning
+    if (sbpChange < -20) {
+      alerts.push({
+        type: 'deteriorating',
+        severity: 'critical',
+        parameter: 'Blood Pressure',
+        message: `🚨 BP dropping: ${previous.vitals.sbp} → ${latest.vitals.sbp} mmHg (${sbpChange}) in ${minutesDiff} min`,
+        action: 'Assess for shock: IV access, fluids, check for bleeding',
+        trend: 'worsening',
+        change: sbpChange
+      });
+    }
+  }
+  
+  return alerts.length > 0 ? alerts : null;
+}
+
+
 // ============ API ENDPOINTS ============
 
 app.get('/api/health', (req, res) => {
@@ -257,7 +463,7 @@ app.get('/api/health', (req, res) => {
 // Check-in endpoint
 app.post('/api/checkin', async (req, res) => {
   try {
-    const { device_patient_id, age, sex, symptoms, vitals, comorbid, custom_symptoms } = req.body;
+    const { full_name, age, sex, symptoms, vitals, comorbid, custom_symptoms } = req.body;
 
     // Analyze custom symptoms with AI if provided
     let aiAnalysis = null;
@@ -276,11 +482,22 @@ app.post('/api/checkin', async (req, res) => {
     // Apply AI urgency boost
     const finalScore = Math.min(100, triageResult.score + urgencyBoost);
 
+    // Check for critical vitals at check-in
+    const criticalVitalsAlerts = checkCriticalVitals(vitals, age);
+    const hasCriticalVitals = criticalVitalsAlerts.some(alert => alert.severity === 'critical');
+    
+    // Store vitals history for tracking
+    const vitalsHistory = [{
+      timestamp: new Date().toISOString(),
+      vitals: vitals,
+      taken_by: 'System (Check-in)'
+    }];
+
     // Insert patient
     const { data: patient, error: insertError } = await supabase
       .from('patients')
       .insert({
-        device_patient_id,
+        full_name,
         age,
         sex,
         symptoms,
@@ -291,7 +508,9 @@ app.post('/api/checkin', async (req, res) => {
         meta: { 
           comorbid,
           custom_symptoms,
-          ai_analysis: aiAnalysis
+          ai_analysis: aiAnalysis,
+          vitals_history: vitalsHistory,
+          critical_vitals_alerts: criticalVitalsAlerts
         }
       })
       .select()
@@ -330,11 +549,38 @@ app.post('/api/checkin', async (req, res) => {
       io.emit('alert:raised', {
         alert_id: alert?.id,
         patient_id: patient.id,
+        full_name: full_name,
         alert_type: 'critical_patient',
         triage_score: finalScore,
         ai_severity: aiAnalysis?.severity,
         timestamp: new Date().toISOString()
       });
+    }
+
+    // Raise critical vitals alerts if any
+    if (hasCriticalVitals) {
+      for (const vitalAlert of criticalVitalsAlerts.filter(a => a.severity === 'critical')) {
+        const { data: alert } = await supabase.from('alerts').insert({
+          patient_id: patient.id,
+          alert_type: 'critical_vitals',
+          payload: {
+            ...vitalAlert,
+            full_name: full_name,
+            triage_score: finalScore,
+            current_vitals: vitals
+          }
+        }).select().single();
+
+        // Emit alert via WebSocket
+        io.emit('alert:raised', {
+          alert_id: alert?.id,
+          patient_id: patient.id,
+          full_name: full_name,
+          alert_type: 'critical_vitals',
+          vital_alert: vitalAlert,
+          timestamp: new Date().toISOString()
+        });
+      }
     }
 
     // Emit queue update
@@ -382,6 +628,125 @@ app.get('/api/queue', async (req, res) => {
     });
   } catch (error) {
     console.error('Queue fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update Vitals Endpoint
+app.post('/api/patients/:id/vitals', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { vitals, notes } = req.body; // Expecting { hr, sbp, spo2 }
+    
+    // 1. Fetch current patient data
+    const { data: patient, error: fetchError } = await supabase
+      .from('patients')
+      .select('*')
+      .eq('id', id)
+      .single();
+      
+    if (fetchError) throw fetchError;
+    
+    // 2. Prepare history update
+    const currentMeta = patient.meta || {};
+    const oldHistory = currentMeta.vitals_history || [];
+    
+    // Create new history entry
+    const newEntry = {
+      timestamp: new Date().toISOString(),
+      vitals: vitals,
+      notes: notes || 'Routine recheck',
+      taken_by: 'Staff'
+    };
+    
+    const newHistory = [...oldHistory, newEntry];
+    
+    // 3. Run Checks
+    const criticalAlerts = checkCriticalVitals(vitals, patient.age);
+    const deteriorationAlerts = detectDeterioration(newHistory);
+    
+    // 4. Calculate Score Boost based on findings
+    let scoreBoost = 0;
+    
+    // Deterioration boost
+    if (deteriorationAlerts && deteriorationAlerts.length > 0) {
+      scoreBoost += 15; // +15 for deterioration trend
+    }
+    
+    // Critical vitals boost
+    const hasCritical = criticalAlerts.some(a => a.severity === 'critical');
+    if (hasCritical) {
+      scoreBoost += 25; // +25 for immediate critical vitals
+    }
+    
+    // Cap score at 100
+    const newScore = Math.min(100, patient.triage_score + scoreBoost);
+    
+    // 5. Update Patient record
+    const { data: updatedPatient, error: updateError } = await supabase
+      .from('patients')
+      .update({
+        vitals: vitals, // Update current vitals
+        triage_score: newScore,
+        // Upgrade method tag if boosted
+        triage_method: (scoreBoost > 0 && !patient.triage_method.includes('deterioration')) 
+          ? `${patient.triage_method}+deterioration` 
+          : patient.triage_method,
+        meta: {
+          ...currentMeta,
+          vitals_history: newHistory,
+          latest_alerts: [...(criticalAlerts || []), ...(deteriorationAlerts || [])]
+        }
+      })
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (updateError) throw updateError;
+    
+    // 6. Generate Alerts
+    const allAlerts = [...criticalAlerts, ...(deteriorationAlerts || [])];
+    
+    for (const alertDetails of allAlerts) {
+      // Save to DB
+      const { data: alert } = await supabase.from('alerts').insert({
+        patient_id: id,
+        alert_type: alertDetails.type, // 'critical_vitals' or 'deteriorating'
+        payload: {
+          ...alertDetails,
+          new_score: newScore,
+          full_name: patient.full_name
+        }
+      }).select().single();
+      
+      // Emit realtime socket event
+      io.emit('alert:raised', {
+        alert_id: alert?.id,
+        patient_id: id,
+        full_name: patient.full_name,
+        alert_type: alertDetails.type,
+        details: alertDetails,
+        new_score: newScore,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // 7. Emit Queue Update to refresh UI
+    io.emit('queue:update', {
+      action: 'vitals_updated',
+      patient_id: id,
+      new_score: newScore
+    });
+
+    res.json({
+      success: true,
+      patient: updatedPatient,
+      alerts: allAlerts,
+      score_boost: scoreBoost
+    });
+    
+  } catch (error) {
+    console.error('Vitals update error:', error);
     res.status(500).json({ error: error.message });
   }
 });
