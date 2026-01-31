@@ -13,6 +13,8 @@ class PredictRequest(BaseModel):
     hr: int
     sbp: int
     spo2: int
+    temp: float = 37.0  # Default normal temperature
+    rr: int = 16  # Default normal respiratory rate
     symptoms: List[str]
     comorbid: int = 0
 
@@ -73,7 +75,8 @@ def predict(req: PredictRequest):
             detail="Model not loaded. Please train the model first using generate_and_train.py"
         )
     
-    # Extract features in the correct order
+    # Extract features in the correct order (must match training order)
+    # Order: age, hr, sbp, spo2, temp, rr, chest_pain, breathless, comorbid
     chest_pain = 1 if 'chest_pain' in req.symptoms else 0
     breathless = 1 if 'shortness_of_breath' in req.symptoms else 0
     
@@ -82,6 +85,8 @@ def predict(req: PredictRequest):
         req.hr,
         req.sbp,
         req.spo2,
+        req.temp,
+        req.rr,
         chest_pain,
         breathless,
         req.comorbid
@@ -92,7 +97,7 @@ def predict(req: PredictRequest):
     score = int(round(prob * 100))
     
     # Feature contributions for explainability
-    feature_names = ['age', 'hr', 'sbp', 'spo2', 'chest_pain', 'breathless', 'comorbid']
+    feature_names = ['age', 'hr', 'sbp', 'spo2', 'temp', 'rr', 'chest_pain', 'breathless', 'comorbid']
     features_used = {
         name: float(val) for name, val in zip(feature_names, features[0])
     }

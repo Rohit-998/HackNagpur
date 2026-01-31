@@ -19,7 +19,7 @@ A real-time, privacy-first patient triage system that transforms clinics into sm
 - 🧠 **Deep AI Analysis**: Uses **Groq** (Llama 3) to analyze complex symptom descriptions.
 - ⚡ **Instant Triage**: ML Service calculates urgency scores (0-100) in milliseconds.
 - 🖥️ **Command Center HUD**: A futuristic Dashboard for real-time queue monitoring.
-- 🚨 **Smart Alerts**: Auto-detection of critical patients and SLA breaches.
+- 🚨 **Smart Alerts**: Auto-detection of critical patients .
 - 🔍 **Explainable Decisions**: Full audit trails for every AI prediction.
 
 ---
@@ -204,11 +204,13 @@ Use the helper script to collect your environment variables:
 
 **Model**: Logistic Regression (scikit-learn)
 
-**Features**:
+**Features (9 total)**:
 - Age
 - Heart Rate (HR)
 - Systolic Blood Pressure (SBP)
 - Oxygen Saturation (SpO2)
+- **Temperature** (°C)
+- **Respiratory Rate** (breaths/min)
 - Chest Pain (binary)
 - Shortness of Breath (binary)
 - Comorbidities Count

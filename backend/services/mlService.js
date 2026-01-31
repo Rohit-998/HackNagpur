@@ -35,6 +35,26 @@ function computeTriageRule({ age, symptoms = [], vitals = {}, weights }) {
     score += weights.age_over_65;
     fired.push('age_over_65');
   }
+  
+  // Temperature rules
+  if (vitals.temp && vitals.temp > 38.5) {
+    score += weights.fever_high;
+    fired.push('fever_high');
+  }
+  if (vitals.temp && vitals.temp < 36.0) {
+    score += weights.hypothermia;
+    fired.push('hypothermia');
+  }
+  
+  // Respiratory Rate rules
+  if (vitals.rr && vitals.rr > 24) {
+    score += weights.tachypnea;
+    fired.push('tachypnea');
+  }
+  if (vitals.rr && vitals.rr < 10) {
+    score += weights.bradypnea;
+    fired.push('bradypnea');
+  }
 
   score = Math.max(0, Math.min(100, Math.round(score)));
   return { score, fired, method: 'rules' };
@@ -47,6 +67,8 @@ async function callMLService(patient) {
       hr: patient.vitals?.hr || 80,
       sbp: patient.vitals?.sbp || 120,
       spo2: patient.vitals?.spo2 || 98,
+      temp: patient.vitals?.temp || 37.0,
+      rr: patient.vitals?.rr || 16,
       symptoms: patient.symptoms || [],
       comorbid: patient.meta?.comorbid || 0
     };
@@ -83,7 +105,11 @@ async function getTriageWeights() {
       hr_high: 15,
       altered_consciousness: 40,
       age_over_65: 8,
-      comorbid: 10
+      comorbid: 10,
+      fever_high: 15,
+      hypothermia: 25,
+      tachypnea: 20,
+      bradypnea: 25
     };
   }
   return data.value;
@@ -208,9 +234,87 @@ function checkCriticalVitals(vitals, age) {
         value: vitals.sbp,
         message: `⚠️ Elevated BP: ${vitals.sbp} mmHg`,
         action: 'Monitor BP, check for end-organ damage if symptomatic'
+       });
+    }
+  }
+  
+  // Temperature checks
+  if (vitals.temp) {
+    if (vitals.temp >= 39.5) {
+      alerts.push({
+        type: 'critical_vitals',
+        severity: 'critical',
+        parameter: 'Temperature',
+        value: vitals.temp,
+        threshold: 39.5,
+        message: `Critical: High fever (${vitals.temp}°C) - Risk of heat stroke/sepsis`,
+        action: 'Antipyretics, cooling measures, investigate source, consider sepsis protocol'
+      });
+    } else if (vitals.temp < 36.0) {
+      alerts.push({
+        type: 'critical_vitals',
+        severity: 'critical',
+        parameter: 'Temperature',
+        value: vitals.temp,
+        threshold: 36.0,
+        message: `Critical: Hypothermia (${vitals.temp}°C) - Rewarming needed`,
+        action: 'Passive/active rewarming, assess for shock, consider cardiac monitoring'
+      });
+    } else if (vitals.temp > 38.5) {
+      alerts.push({
+        type: 'warning_vitals',
+        severity: 'medium',
+        parameter: 'Temperature',
+        value: vitals.temp,
+        message: `⚠️ Fever detected: ${vitals.temp}°C`,
+        action: 'Antipyretics, fluid support, monitor for infection source'
       });
     }
   }
+  
+  // Respiratory Rate checks
+  if (vitals.rr) {
+    if (vitals.rr > 30) {
+      alerts.push({
+        type: 'critical_vitals',
+        severity: 'critical',
+        parameter: 'Respiratory Rate',
+        value: vitals.rr,
+        threshold: 30,
+        message: `Critical: Severe tachypnea (${vitals.rr}/min) - Respiratory distress`,
+        action: 'Assess airway/breathing, oxygen therapy, consider respiratory failure'
+      });
+    } else if (vitals.rr < 10) {
+      alerts.push({
+        type: 'critical_vitals',
+        severity: 'critical',
+        parameter: 'Respiratory Rate',
+        value: vitals.rr,
+        threshold: 10,
+        message: `Critical: Severe bradypnea (${vitals.rr}/min) - Risk of respiratory arrest`,
+        action: 'Assess consciousness, consider ventilatory support, reverse opioids if applicable'
+      });
+    } else if (vitals.rr > 24) {
+      alerts.push({
+        type: 'warning_vitals',
+        severity: 'medium',
+        parameter: 'Respiratory Rate',
+        value: vitals.rr,
+        message: `⚠️ Elevated respiratory rate: ${vitals.rr}/min`,
+        action: 'Assess for pain, anxiety, metabolic acidosis, or respiratory pathology'
+      });
+    } else if (vitals.rr < 12) {
+      alerts.push({
+        type: 'warning_vitals',
+        severity: 'medium',
+        parameter: 'Respiratory Rate',
+        value: vitals.rr,
+        message: `⚠️ Low respiratory rate: ${vitals.rr}/min`,
+        action: 'Monitor closely, assess for sedation or neurological causes'
+      });
+    }
+  }
+  
   return alerts;
 }
 

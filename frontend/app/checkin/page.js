@@ -25,7 +25,9 @@ export default function CheckinPage() {
     vitals: {
       hr: '',
       sbp: '',
-      spo2: ''
+      spo2: '',
+      temp: '',
+      rr: ''
     },
     comorbid: 0,
     custom_symptoms: ''
@@ -144,7 +146,9 @@ export default function CheckinPage() {
         vitals: {
           hr: formData.vitals.hr ? parseInt(formData.vitals.hr) : undefined,
           sbp: formData.vitals.sbp ? parseInt(formData.vitals.sbp) : undefined,
-          spo2: formData.vitals.spo2 ? parseInt(formData.vitals.spo2) : undefined
+          spo2: formData.vitals.spo2 ? parseInt(formData.vitals.spo2) : undefined,
+          temp: formData.vitals.temp ? parseFloat(formData.vitals.temp) : undefined,
+          rr: formData.vitals.rr ? parseInt(formData.vitals.rr) : undefined
         }
       }
 
@@ -159,7 +163,7 @@ export default function CheckinPage() {
           age: '',
           sex: 'other',
           symptoms: [],
-          vitals: { hr: '', sbp: '', spo2: '' },
+          vitals: { hr: '', sbp: '', spo2: '', temp: '', rr: '' },
           comorbid: 0,
           custom_symptoms: ''
         })
@@ -279,7 +283,7 @@ export default function CheckinPage() {
                   <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                   Telemetry / Vitals
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                   <div className="glass-card bg-slate-900/40 p-4 border border-white/5 hover:border-primary-500/30 transition-colors group">
                     <label className="block text-xs text-slate-500 mb-1 group-hover:text-primary-400 transition-colors">Heart Rate</label>
                     <div className="flex items-baseline gap-2">
@@ -323,6 +327,37 @@ export default function CheckinPage() {
                         placeholder="--"
                       />
                       <span className="text-xs text-slate-600">%</span>
+                    </div>
+                  </div>
+                  <div className="glass-card bg-slate-900/40 p-4 border border-white/5 hover:border-amber-500/30 transition-colors group">
+                    <label className="block text-xs text-slate-500 mb-1 group-hover:text-amber-400 transition-colors">Temperature</label>
+                    <div className="flex items-baseline gap-2">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="35"
+                        max="42"
+                        value={formData.vitals.temp}
+                        onChange={e => setFormData({...formData, vitals: {...formData.vitals, temp: e.target.value}})}
+                        className="w-full bg-transparent text-2xl font-bold font-mono text-white outline-none placeholder-slate-700"
+                        placeholder="--"
+                      />
+                      <span className="text-xs text-slate-600">°C</span>
+                    </div>
+                  </div>
+                  <div className="glass-card bg-slate-900/40 p-4 border border-white/5 hover:border-cyan-500/30 transition-colors group">
+                    <label className="block text-xs text-slate-500 mb-1 group-hover:text-cyan-400 transition-colors">Resp. Rate</label>
+                    <div className="flex items-baseline gap-2">
+                      <input
+                        type="number"
+                        min="5"
+                        max="50"
+                        value={formData.vitals.rr}
+                        onChange={e => setFormData({...formData, vitals: {...formData.vitals, rr: e.target.value}})}
+                        className="w-full bg-transparent text-2xl font-bold font-mono text-white outline-none placeholder-slate-700"
+                        placeholder="--"
+                      />
+                      <span className="text-xs text-slate-600">/min</span>
                     </div>
                   </div>
                 </div>

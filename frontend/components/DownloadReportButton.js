@@ -102,18 +102,28 @@ const DownloadReportButton = ({ patient, history, alerts, className }) => {
         entry.vitals.hr || '-',
         entry.vitals.spo2 || '-',
         entry.vitals.sbp || '-',
-        entry.vitals.resp || '-',
+        entry.vitals.temp ? `${entry.vitals.temp}°C` : '-',
+        entry.vitals.rr ? `${entry.vitals.rr}/min` : '-',
         entry.notes || '-'
     ]);
 
     // Use autoTable
     autoTable(doc, {
         startY: yPos,
-        head: [['Time', 'HR', 'SpO2', 'BP (Sys)', 'Resp', 'Notes']],
+        head: [['Time', 'HR (BPM)', 'SpO2 (%)', 'BP (mmHg)', 'Temp', 'RR', 'Notes']],
         body: tableData,
         theme: 'grid',
         headStyles: { fillColor: primaryColor, textColor: 255 },
-        styles: { fontSize: 9 },
+        styles: { fontSize: 8 },
+        columnStyles: {
+            0: { cellWidth: 22 },  // Time
+            1: { cellWidth: 18 },  // HR
+            2: { cellWidth: 18 },  // SpO2
+            3: { cellWidth: 20 },  // BP
+            4: { cellWidth: 20 },  // Temp
+            5: { cellWidth: 18 },  // RR
+            6: { cellWidth: 'auto' }  // Notes
+        }
     });
 
     // Move yPos to end of table

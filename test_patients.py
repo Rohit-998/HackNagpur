@@ -18,7 +18,7 @@ test_patients = [
             "age": 72,
             "sex": "male",
             "symptoms": ["chest_pain", "shortness_of_breath"],
-            "vitals": {"hr": 145, "sbp": 85, "spo2": 88},
+            "vitals": {"hr": 145, "sbp": 85, "spo2": 88, "temp": 39.2, "rr": 28},
             "comorbid": 2
         },
         "expected_range": (85, 100),
@@ -31,7 +31,7 @@ test_patients = [
             "age": 55,
             "sex": "female",
             "symptoms": ["chest_pain"],
-            "vitals": {"hr": 110, "sbp": 130, "spo2": 94},
+            "vitals": {"hr": 110, "sbp": 130, "spo2": 94, "temp": 37.8, "rr": 22},
             "comorbid": 1
         },
         "expected_range": (70, 84),
@@ -44,7 +44,7 @@ test_patients = [
             "age": 45,
             "sex": "other",
             "symptoms": ["abdominal_pain", "fever"],
-            "vitals": {"hr": 95, "sbp": 120, "spo2": 97},
+            "vitals": {"hr": 95, "sbp": 120, "spo2": 97, "temp": 38.3, "rr": 18},
             "comorbid": 0
         },
         "expected_range": (50, 69),
@@ -57,7 +57,7 @@ test_patients = [
             "age": 28,
             "sex": "female",
             "symptoms": ["headache"],
-            "vitals": {"hr": 75, "sbp": 118, "spo2": 99},
+            "vitals": {"hr": 75, "sbp": 118, "spo2": 99, "temp": 36.8, "rr": 14},
             "comorbid": 0
         },
         "expected_range": (0, 49),
@@ -70,7 +70,7 @@ test_patients = [
             "age": 80,
             "sex": "male",
             "symptoms": ["chest_pain", "shortness_of_breath", "altered_consciousness"],
-            "vitals": {"hr": 155, "sbp": 75, "spo2": 82},
+            "vitals": {"hr": 155, "sbp": 75, "spo2": 82, "temp": 40.1, "rr": 32},
             "comorbid": 3
         },
         "expected_range": (90, 100),

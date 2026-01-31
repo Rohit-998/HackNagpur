@@ -8,6 +8,8 @@ export default function VitalsRecheckModal({ patient, onClose, onUpdate }) {
     hr: '',
     sbp: '',
     spo2: '',
+    temp: '',
+    rr: '',
     notes: ''
   })
   const [loading, setLoading] = useState(false)
@@ -20,6 +22,8 @@ export default function VitalsRecheckModal({ patient, onClose, onUpdate }) {
         hr: patient.vitals?.hr || '',
         sbp: patient.vitals?.sbp || '',
         spo2: patient.vitals?.spo2 || '',
+        temp: patient.vitals?.temp || '',
+        rr: patient.vitals?.rr || '',
         notes: ''
       })
     }
@@ -37,7 +41,9 @@ export default function VitalsRecheckModal({ patient, onClose, onUpdate }) {
         vitals: {
           hr: parseInt(formData.hr),
           sbp: parseInt(formData.sbp),
-          spo2: parseInt(formData.spo2)
+          spo2: parseInt(formData.spo2),
+          temp: parseFloat(formData.temp),
+          rr: parseInt(formData.rr)
         },
         notes: formData.notes
       }
@@ -57,7 +63,9 @@ export default function VitalsRecheckModal({ patient, onClose, onUpdate }) {
     time: new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     hr: entry.vitals.hr,
     sbp: entry.vitals.sbp,
-    spo2: entry.vitals.spo2
+    spo2: entry.vitals.spo2,
+    temp: entry.vitals.temp,
+    rr: entry.vitals.rr
   })) || []
 
   // Add current if existing history
@@ -66,7 +74,9 @@ export default function VitalsRecheckModal({ patient, onClose, onUpdate }) {
       time: 'Check-in',
       hr: patient.vitals.hr,
       sbp: patient.vitals.sbp,
-      spo2: patient.vitals.spo2
+      spo2: patient.vitals.spo2,
+      temp: patient.vitals.temp,
+      rr: patient.vitals.rr
     })
   }
 
@@ -164,6 +174,42 @@ export default function VitalsRecheckModal({ patient, onClose, onUpdate }) {
                     placeholder="--"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-600">mmHg</span>
+                </div>
+              </div>
+
+              {/* Temperature & Respiratory Rate Row */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Temperature */}
+                <div className="group">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 group-focus-within:text-amber-400 transition-colors">Temperature</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      required
+                      value={formData.temp}
+                      onChange={e => setFormData({...formData, temp: e.target.value})}
+                      className="w-full bg-slate-950/50 border border-white/10 rounded-xl px-4 py-3 text-2xl font-mono font-bold text-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 outline-none transition-all"
+                      placeholder="--"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-600">°C</span>
+                  </div>
+                </div>
+
+                {/* Respiratory Rate */}
+                <div className="group">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 group-focus-within:text-purple-400 transition-colors">Resp. Rate</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      required
+                      value={formData.rr}
+                      onChange={e => setFormData({...formData, rr: e.target.value})}
+                      className="w-full bg-slate-950/50 border border-white/10 rounded-xl px-4 py-3 text-2xl font-mono font-bold text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none transition-all"
+                      placeholder="--"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-600">/min</span>
+                  </div>
                 </div>
               </div>
 
