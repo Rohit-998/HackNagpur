@@ -210,7 +210,7 @@ export default function CheckinPage() {
           </div>
           
           <Link href="/dashboard" className="group flex items-center gap-3 px-5 py-3 glass rounded-xl hover:shadow-glow transition-all border border-white/10 hover:border-primary-500/50">
-            <div className="flex flex-col text-right hidden sm:block">
+            <div className="hidden sm:flex flex-col text-right">
               <span className="text-xs text-slate-400 group-hover:text-slate-300">View Active Queue</span>
               <span className="text-sm font-bold text-white group-hover:text-primary-400">Live Dashboard</span>
             </div>

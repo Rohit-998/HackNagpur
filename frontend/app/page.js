@@ -90,12 +90,7 @@ export default function Home() {
            </div>
         </div>
 
-        {/* Footer info */}
-        <div className="text-center border-t border-slate-800 pt-8">
-            <p className="text-slate-600 text-sm font-mono">
-                SYSTEM STATUS: <span className="text-emerald-500">OPERATIONAL</span> | VERSION 2.0.4
-            </p>
-        </div>
+  
       </div>
     </main>
   )

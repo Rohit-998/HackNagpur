@@ -336,11 +336,14 @@ Hack_Nagpur/
 │   │   ├── page.js        # Landing page
 │   │   ├── checkin/       # Check-in form
 │   │   ├── dashboard/     # Queue dashboard
+│   │   ├── treatment/     # Active care & monitoring
+│   │   ├── volume/        # Daily analytics
 │   │   ├── admin/         # Admin panel
 │   │   └── audit/         # Audit trails
 │   ├── components/
 │   │   └── RealtimeProvider.js
 │   └── Dockerfile
+
 ├── ml/                     # Python FastAPI ML service
 │   ├── generate_and_train.py
 │   ├── ml_service.py
@@ -377,6 +380,7 @@ Hack_Nagpur/
 |--------|----------|-------------|
 | `POST` | `/api/checkin` | Create new patient check-in |
 | `GET` | `/api/queue` | Fetch current queue |
+| `GET` | `/api/analytics/daily` | Get daily patient volume stats |
 | `POST` | `/api/triage/recompute/:id` | Recompute patient triage |
 | `GET` | `/api/admin/weights` | Get triage weights |
 | `POST` | `/api/admin/weights` | Update triage weights |
@@ -462,15 +466,9 @@ Always defer to qualified healthcare professionals for final medical decisions. 
 
 ---
 
-## 📄 License
-
-MIT License - See LICENSE file for details
-
----
-
 ## 👥 Team
 
-Built for **HT-1 Hackathon** by the Anti Gravity team.
+Built for **HT-1 Hackathon** 
 
 ---
 
@@ -483,6 +481,6 @@ For questions or issues:
 
 ---
 
-**Built with ❤️ using AI-powered development**
 
-🚀 **Ready to optimize your clinic queue!**
+
+
