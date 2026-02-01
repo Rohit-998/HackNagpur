@@ -3,10 +3,11 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const axios = require('axios');
 
 // Modular Imports
 const { supabase } = require('./config/clients');
-const { computeTriage, checkCriticalVitals, detectDeterioration, getTriageWeights } = require('./services/mlService');
+const { checkCriticalVitals, detectDeterioration, getTriageWeights } = require('./services/mlService');
 const { analyzeCustomSymptoms } = require('./services/aiService');
 
 const app = express();
@@ -54,21 +55,39 @@ app.get('/health', (req, res) => {
 // Fetch active alerts
 app.get('/api/alerts/active', async (req, res) => {
   try {
-    const { data: alerts, error } = await supabase
+    const { hospital_id } = req.query;
+
+    let query = supabase
       .from('alerts')
-      .select('*, patient:patients!inner(id, full_name, status)')
-      .eq('patient.status', 'waiting')
+      .select('*, patient:patients(id, full_name, status, hospital_id)') 
+      // Removed .eq('resolved', false) as column doesn't exist.
+      // We assume alerts are ephemeral or "Active" if recently created.
       .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(20);
+
+    const { data: alerts, error } = await query;
 
     if (error) throw error;
 
-    const formattedAlerts = alerts.map(a => ({
+    let formattedAlerts = alerts.map(a => ({
       ...a,
-      full_name: a.patient?.full_name
+      full_name: a.patient?.full_name,
+      hospital_id: a.patient?.hospital_id || a.payload?.hospital_id // Fallback to payload for distress signals
     }));
 
+    // Manual Filter for Hospital context
+    if (hospital_id) {
+       formattedAlerts = formattedAlerts.filter(a => 
+          // If linked to a patient, must match hospital
+          (a.patient && a.patient.hospital_id == hospital_id) || 
+          // OR if it's a distress signal with explicit ID
+          (a.alert_type === 'distress_signal' && a.payload?.hospital_id == hospital_id)
+       );
+    }
+    
     res.json(formattedAlerts);
+
+
   } catch (error) {
     console.error('Alerts fetch error:', error);
     res.status(500).json({ error: error.message });
@@ -78,7 +97,7 @@ app.get('/api/alerts/active', async (req, res) => {
 // Check-in endpoint
 app.post('/api/checkin', async (req, res) => {
   try {
-    const { full_name, age, sex, symptoms, vitals, comorbid, custom_symptoms } = req.body;
+    const { full_name, age, sex, symptoms, vitals, comorbid, custom_symptoms, hospital_id, injury_score } = req.body;
 
     // AI Analysis
     let aiAnalysis = null;
@@ -89,8 +108,8 @@ app.post('/api/checkin', async (req, res) => {
       urgencyBoost = aiAnalysis.urgency_boost;
     }
 
-    // Compute triage
-    const patientData = { age, symptoms, vitals, meta: { comorbid } };
+    // Compute triage (Include Injury Score)
+    const patientData = { age, symptoms, vitals, injury_score: injury_score || 0, meta: { comorbid } };
     const triageResult = await computeTriage(patientData);
     
     const finalScore = Math.min(100, triageResult.score + urgencyBoost);
@@ -109,6 +128,7 @@ app.post('/api/checkin', async (req, res) => {
     const { data: patient, error: insertError } = await supabase
       .from('patients')
       .insert({
+        hospital_id: hospital_id || 1, // Default to General Hospital if missing
         full_name,
         age,
         sex,
@@ -119,6 +139,7 @@ app.post('/api/checkin', async (req, res) => {
         status: 'waiting',
         meta: { 
           comorbid,
+          injury_score: injury_score || 0, // Persist raw injury score
           custom_symptoms,
           ai_analysis: aiAnalysis,
           vitals_history: vitalsHistory,
@@ -204,15 +225,19 @@ app.post('/api/checkin', async (req, res) => {
 // Get Queue (Paginated, filtered by status)
 app.get('/api/queue', async (req, res) => {
   try {
-    const { page = 1, limit = 10, status = 'waiting' } = req.query;
+    const { page = 1, limit = 10, status = 'waiting', hospital_id } = req.query;
     const from = (page - 1) * limit;
     const to = from + parseInt(limit) - 1;
 
     // 1. Fetch Summary for Stats
-    const { data: allMatching, error: statsError } = await supabase
+    let statsQuery = supabase
       .from('patients')
       .select('triage_score, arrival_ts')
       .eq('status', status);
+      
+    if (hospital_id) statsQuery = statsQuery.eq('hospital_id', hospital_id);
+    
+    const { data: allMatching, error: statsError } = await statsQuery;
       
     if (statsError) throw statsError;
 
@@ -223,10 +248,15 @@ app.get('/api/queue', async (req, res) => {
     const total_count = allMatching.length;
 
     // 2. Fetch Paginated Rows
-    const { data: patients, error } = await supabase
+    // 2. Fetch Paginated Rows
+    let queueQuery = supabase
       .from('patients')
       .select('*')
-      .eq('status', status)
+      .eq('status', status);
+      
+    if (hospital_id) queueQuery = queueQuery.eq('hospital_id', hospital_id);
+
+    const { data: patients, error } = await queueQuery
       .order('triage_score', { ascending: false })
       .order('arrival_ts', { ascending: true })
       .range(from, to);
@@ -256,7 +286,7 @@ app.get('/api/queue', async (req, res) => {
 // Patient Directory
 app.get('/api/patients', async (req, res) => {
   try {
-    const { search, page = 1, limit = 10 } = req.query;
+    const { search, page = 1, limit = 10, hospital_id } = req.query;
     const from = (page - 1) * limit;
     const to = from + parseInt(limit) - 1;
 
@@ -268,6 +298,10 @@ app.get('/api/patients', async (req, res) => {
 
     if (search) {
       query = query.ilike('full_name', `%${search}%`);
+    }
+    
+    if (hospital_id) {
+       query = query.eq('hospital_id', hospital_id);
     }
 
     const { data: patients, count, error } = await query;
@@ -294,10 +328,16 @@ app.get('/api/analytics', async (req, res) => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
 
-    const { data: patients, error } = await supabase
+    const { hospital_id } = req.query; 
+
+    let query = supabase
       .from('patients')
       .select('triage_score, symptoms, arrival_ts, status')
       .gte('arrival_ts', yesterday.toISOString());
+      
+    if (hospital_id) query = query.eq('hospital_id', hospital_id);
+
+    const { data: patients, error } = await query;
 
     if (error) throw error;
 
@@ -482,13 +522,76 @@ app.get('/api/admin/weights', async (req, res) => {
   }
 });
 
+// ============ CITY & NETWORK FEATURES ============
+
+// Get City Network Status (Hospital Load)
+app.get('/api/network', async (req, res) => {
+  try {
+    const { data: hospitals, error } = await supabase
+      .from('hospitals')
+      .select('*')
+      .order('distance_km', { ascending: true });
+      
+    if (error) throw error;
+    res.json(hospitals);
+  } catch (error) {
+    console.error('Network fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Simulate Distress Signal (CCTV/Visual AI)
+app.post('/api/distress', async (req, res) => {
+  try {
+    const { zone, signal_type, confidence, patient_id, hospital_id } = req.body;
+    
+    // Create a special alert for distress
+    const { data: alert, error } = await supabase.from('alerts').insert({
+       patient_id: patient_id || null, 
+       alert_type: 'distress_signal',
+       payload: {
+         zone: zone || 'Waiting Room A',
+         signal: signal_type || 'collapse',
+         confidence: confidence || 0.92,
+         message: `Visual Distress Detected: ${signal_type} in ${zone}`,
+         detected_at: new Date().toISOString(),
+         hospital_id: hospital_id || 1 
+       }
+    }).select().single();
+    
+    if (error) throw error;
+    
+    // Broadcast immediately to all dashboards
+    io.emit('alert:raised', {
+      alert_id: alert.id,
+      alert_type: 'distress_signal',
+      zone: zone || 'Waiting Room A',
+      signal: signal_type || 'collapse',
+      message: `Visual Distress: ${signal_type} detected in ${zone || 'Waiting Room A'}`,
+      timestamp: new Date().toISOString(),
+      hospital_id: hospital_id || 1
+    });
+    
+    res.json({ success: true, alert_id: alert.id });
+  } catch (error) {
+    console.error('Distress signal error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Daily Volume Analytics
 app.get('/api/analytics/daily', async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { hospital_id } = req.query;
+
+    let query = supabase
       .from('patients')
       .select('arrival_ts, triage_score')
       .order('arrival_ts', { ascending: true });
+      
+    if (hospital_id) query = query.eq('hospital_id', hospital_id);
+
+    const { data, error } = await query;
 
     if (error) throw error;
 
@@ -518,6 +621,162 @@ app.get('/api/analytics/daily', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Daily analytics error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Helper: Compute Triage (Rule Based + Injury Aware)
+// Helper: Compute Triage (ML First -> Rule Fallback)
+async function computeTriage(patient) {
+  try {
+    // 1. Try ML Service
+    const mlResponse = await axios.post(`${process.env.ML_SERVICE_URL || 'http://localhost:8000'}/predict`, {
+      age: patient.age,
+      hr: patient.vitals.hr || 80,
+      sbp: patient.vitals.sbp || 120,
+      spo2: patient.vitals.spo2 || 98,
+      temp: patient.vitals.temp || 37.0,
+      rr: patient.vitals.rr || 16,
+      symptoms: patient.symptoms,
+      comorbid: patient.meta.comorbid || 0,
+      injury_score: patient.injury_score || 0
+    });
+    
+    let score = mlResponse.data.triage_score;
+    let method = 'ml';
+    
+    // Safety Net: Even if ML says low, if injury is MASSIVE, force high score.
+    // The ML model is trained on this, but let's be safe.
+    if (patient.injury_score > 80 && score < 70) {
+        score = 85; 
+        method = 'ml+injury_override';
+    }
+
+    return { score, method, explanation: mlResponse.data.features_used };
+
+  } catch (error) {
+    console.error('ML Service unavailable, using rule fallback:', error.message);
+    
+    // 2. Fallback Rules
+    let score = 30;
+    let method = 'rule-fallback';
+
+    if (patient.injury_score > 50) { score += 40; method = 'rule-injury-critical'; }
+    else if (patient.injury_score > 20) { score += 20; method = 'rule-injury-moderate'; }
+
+    if (patient.symptoms.includes('chest_pain')) score += 40;
+    if (patient.symptoms.includes('shortness_of_breath')) score += 30;
+    if (patient.age > 65) score += 10;
+    
+    if (patient.vitals.spo2 && patient.vitals.spo2 < 90) score += 25;
+    if (patient.vitals.sbp && (patient.vitals.sbp > 180 || patient.vitals.sbp < 90)) score += 20;
+    
+    return { score: Math.min(99, score), method };
+  }
+}
+
+// ============ REFERRAL ENDPOINTS (MULTI-HOSPITAL) ============
+
+// Create Referral (Send Patient)
+app.post('/api/referrals', async (req, res) => {
+  try {
+    const { patient_id, from_hospital_id, to_hospital_id, notes, priority } = req.body;
+    
+    // 1. Create Referral Record
+    const { data: referral, error } = await supabase.from('referrals').insert({
+      patient_id, from_hospital_id, to_hospital_id, notes, priority, status: 'pending'
+    }).select('*, patient:patients(*)').single();
+    
+    if (error) throw error;
+    
+    // 2. Update Patient Status visually (optional, or just add a flag)
+    await supabase.from('patients').update({ 
+      redirect_recommended: true, 
+      redirect_hospital_id: to_hospital_id 
+    }).eq('id', patient_id);
+
+    // 3. AUTO-RESOLVE ALERTS FOR THIS PATIENT
+    // Delete them because they are no longer relevant for the Sender
+    await supabase.from('alerts')
+      .delete()
+      .eq('patient_id', patient_id);
+    
+    // 4. Create "Incoming Referral" Alert for Receiver
+    await supabase.from('alerts').insert({
+       patient_id: patient_id,
+       alert_type: 'incoming_referral',
+       payload: {
+         hospital_id: to_hospital_id, // TARGET HOSPITAL
+         message: `Incoming Referral: ${priority} Priority`,
+         from_hospital_id
+       }
+    });
+
+    // 5. Broadcast Updates
+    io.emit('referral:incoming', { to_hospital_id, referral });
+    io.emit('queue:update', { hospital_id: from_hospital_id });
+    io.emit('alert:created', { hospital_id: from_hospital_id }); // Refresh Sender
+    io.emit('alert:created', { hospital_id: to_hospital_id });   // Refresh Receiver
+    
+    res.json({ success: true, referral });
+  } catch (error) {
+    console.error('Referral creation error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get Pending Referrals (For Receiver)
+app.get('/api/referrals/pending', async (req, res) => {
+  try {
+    const { hospital_id } = req.query;
+    if (!hospital_id) throw new Error("hospital_id required");
+    
+    const { data: referrals, error } = await supabase
+      .from('referrals')
+      .select('*, patient:patients(*), from_hospital:hospitals!referrals_from_hospital_id_fkey(name)')
+      .eq('to_hospital_id', hospital_id)
+      .eq('status', 'pending');
+      
+    if (error) throw error;
+    res.json(referrals);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Accept Referral
+app.post('/api/referrals/:id/accept', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // 1. Get Referral Data
+    const { data: referral } = await supabase.from('referrals').select('*').eq('id', id).single();
+    if (!referral) throw new Error("Referral not found");
+    
+    // 2. Update Referral Status
+    await supabase.from('referrals').update({ status: 'accepted' }).eq('id', id);
+    
+    // 3. Move Patient (The Magic)
+    // We update their hospital_id to the new hospital and ensure status is 'waiting'
+    const { data: patient } = await supabase.from('patients')
+      .update({ 
+        hospital_id: referral.to_hospital_id,
+        status: 'waiting',
+        redirect_recommended: false,
+        redirect_hospital_id: null
+      })
+      .eq('id', referral.patient_id)
+      .select().single();
+      
+    // 4. Emit Events
+    // To Receiver (Add to queue)
+    io.emit('queue:update', { action: 'patient_transferred_in', hospital_id: referral.to_hospital_id });
+    // To Sender (Remove from queue)
+    io.emit('queue:update', { action: 'patient_transferred_out', hospital_id: referral.from_hospital_id });
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Referral accept error:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -244,12 +244,20 @@ Use the helper script to collect your environment variables:
 - **Severity Boosting**: LLM can boost triage scores based on context (e.g., "radiating pain").
 - **Clinical Reasoning**: Provides text explanations for AI decisions.
 
-### 4. **Smart Triage Engine**
+### 4. **AI Computer Vision Security** 🆕
+- **Real-Time Fall Detection**: Uses **MediaPipe Pose** to track 33 body landmarks in video feeds.
+- **Hybrid Voting Logic**: Detects falls using a consensus of:
+  - **Core Collapse**: Hip trajectory hitting floor level.
+  - **Inversion**: Head position dropping below knees.
+  - **Aspect Ratio**: Torso geometry shifting from vertical to horizontal.
+- **Privacy-First**: Analysis happens **Client-Side** in the browser; video is never uploaded to a cloud server.
+
+### 5. **Smart Triage Engine**
 - **Hybrid Model**: Combines Logistic Regression (ML) with Rule-Based heuristics.
 - **Critical Detection**: Instant flags for scores ≥ 85.
 - **Auto-Reordering**: Queue updates in real-time via WebSockets.
 
-### 5. **Privacy & Security**
+### 6. **Privacy & Security**
 - Device-based IDs (no names persisted).
 - Role-based access for Admin functions.
 - Full audit logs for accountability.

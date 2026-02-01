@@ -13,14 +13,21 @@ export default function TreatmentPage() {
   const [pagination, setPagination] = useState({ page: 1, total_pages: 1 })
   const pageRef = useRef(1)
   const [selectedPatient, setSelectedPatient] = useState(null)
+  const [hospital, setHospital] = useState(null) // NEW: State for hospital
   
   const { socket } = useRealtime()
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
-  const fetchPatients = async () => {
+  const fetchPatients = async (hospitalId = hospital?.id) => {
+    if (!hospitalId) return; // Don't fetch if no ID
+    
     try {
       const response = await axios.get(`${API_URL}/api/queue`, {
-        params: { status: 'in_treatment', page: pageRef.current }
+        params: { 
+           status: 'in_treatment', 
+           page: pageRef.current,
+           hospital_id: hospitalId // FILTER APPLIED
+        }
       })
       setPatients(response.data.patients || [])
       setPagination(prev => ({ ...prev, ...response.data.pagination }))
@@ -32,14 +39,24 @@ export default function TreatmentPage() {
   }
 
   useEffect(() => {
-    fetchPatients()
+    // 1. Check Session
+    const session = localStorage.getItem('hospital_session')
+    if (!session) {
+       // Optional: Redirect to login or just show nothing
+       return
+    }
+    const sessionData = JSON.parse(session)
+    setHospital(sessionData)
+    
+    // 2. Fetch with initial ID
+    fetchPatients(sessionData.id)
   }, [])
 
   useEffect(() => {
     if (!socket) return
-    socket.on('queue:update', fetchPatients)
-    return () => socket.off('queue:update', fetchPatients)
-  }, [socket])
+    socket.on('queue:update', () => fetchPatients(hospital?.id))
+    return () => socket.off('queue:update')
+  }, [socket, hospital])
 
   const handleDischarge = async (id) => {
     if (!confirm('Are you sure you want to discharge this patient? This will move them to records.')) return
@@ -57,7 +74,7 @@ export default function TreatmentPage() {
     pageRef.current = newPage
     setPagination(prev => ({ ...prev, page: newPage }))
     setLoading(true)
-    fetchPatients()
+    fetchPatients(hospital?.id)
   }
 
   return (

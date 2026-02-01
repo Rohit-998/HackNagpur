@@ -13,12 +13,23 @@ export default function VolumePage() {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
   useEffect(() => {
-    fetchData()
+    // 1. Check Session
+    const session = localStorage.getItem('hospital_session')
+    if (!session) {
+      // should trigger redirect or handle error
+      return
+    }
+    const sessionData = JSON.parse(session)
+    
+    // 2. Fetch
+    fetchData(sessionData.id)
   }, [])
 
-  const fetchData = async () => {
+  const fetchData = async (hospitalId) => {
     try {
-      const response = await axios.get(`${API_URL}/api/analytics/daily`)
+      const response = await axios.get(`${API_URL}/api/analytics/daily`, {
+        params: { hospital_id: hospitalId }
+      })
       const rawData = response.data || []
       setData(rawData)
       

@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import Link from 'next/link'
+import { Camera } from 'lucide-react'
+import InjuryAnalysisModal from '@/components/InjuryAnalysisModal'
 
 const SYMPTOM_OPTIONS = [
   'chest_pain',
@@ -38,6 +40,26 @@ export default function CheckinPage() {
   const [error, setError] = useState(null)
   const [aiAnalysis, setAiAnalysis] = useState(null)
   
+  // ...
+  const [showInjuryModal, setShowInjuryModal] = useState(false)
+  const [injuryData, setInjuryData] = useState(null)
+
+  const handleInjuryResult = (result) => {
+      setInjuryData(result)
+      setShowInjuryModal(false)
+      
+      // AUTO-FILL LOGIC: If injury is detected, add 'trauma' and 'bleeding'
+      if (result.score > 20) {
+          setFormData(prev => ({
+              ...prev,
+              symptoms: Array.from(new Set([...prev.symptoms, 'trauma', 'bleeding'])),
+              custom_symptoms: prev.custom_symptoms 
+                 ? `${prev.custom_symptoms}\n[AUTO-DETECTED INJURY: Severity ${result.severity}, Heme-Cov ${result.bloodCov}%]`
+                 : `[AUTO-DETECTED INJURY: Severity ${result.severity}, Heme-Cov ${result.bloodCov}%]`
+          }))
+      }
+  }
+
   // Voice Input Logic
   const [isListening, setIsListening] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(false)
@@ -142,6 +164,7 @@ export default function CheckinPage() {
     try {
       const payload = {
         ...formData,
+        injury_score: injuryData?.score || 0, // Pass Visual AI Score
         age: parseInt(formData.age),
         vitals: {
           hr: formData.vitals.hr ? parseInt(formData.vitals.hr) : undefined,
@@ -365,10 +388,19 @@ export default function CheckinPage() {
 
               {/* Section 3: Symptoms */}
               <div className="space-y-4 pt-4 border-t border-white/5">
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-                  Clinical Signs
-                </h3>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+                    Clinical Signs
+                  </h3>
+                  <button
+                     type="button"
+                     onClick={() => setShowInjuryModal(true)}
+                     className="flex items-center gap-2 text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/30 px-3 py-1.5 rounded-full hover:bg-red-500/20 transition-all hover:scale-105 active:scale-95"
+                  >
+                    <Camera size={14} /> Scan Injury
+                  </button>
+                </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {SYMPTOM_OPTIONS.map(symptom => (
                     <button
@@ -589,6 +621,14 @@ export default function CheckinPage() {
           </div>
         </div>
       </div>
+      
+      {/* Modals */}
+      {showInjuryModal && (
+          <InjuryAnalysisModal 
+             onClose={() => setShowInjuryModal(false)}
+             onConfirm={handleInjuryResult}
+          />
+      )}
     </main>
   )
 }

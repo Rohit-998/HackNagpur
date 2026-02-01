@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { io } from 'socket.io-client'
 
 const RealtimeContext = createContext(null)
@@ -8,11 +8,17 @@ const RealtimeContext = createContext(null)
 export function RealtimeProvider({ children }) {
   const [socket, setSocket] = useState(null)
   const [connected, setConnected] = useState(false)
+  const socketRef = useRef(null)
 
   useEffect(() => {
+    if (socketRef.current) return; // Prevent double init
+
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
     const socketInstance = io(API_URL, {
       transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
     })
 
     socketInstance.on('connect', () => {
@@ -26,10 +32,14 @@ export function RealtimeProvider({ children }) {
       setConnected(false)
     })
 
+    socketRef.current = socketInstance
     setSocket(socketInstance)
 
     return () => {
-      socketInstance.close()
+      if (socketRef.current) {
+         socketRef.current.disconnect()
+         socketRef.current = null
+      }
     }
   }, [])
 

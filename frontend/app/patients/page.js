@@ -31,11 +31,29 @@ export default function PatientsDirectory() {
   }, [search])
 
   // Fetch Patients
+  // 1. Session & Initial Fetch
   useEffect(() => {
-    fetchPatients()
-  }, [debouncedSearch, pagination.page])
+    const session = localStorage.getItem('hospital_session')
+    if (!session) {
+      // Handle redirect if needed
+      return 
+    }
+    const sessionData = JSON.parse(session)
+    
+    // Initial fetch with ID
+    fetchPatients(sessionData.id)
+  }, [debouncedSearch, pagination.page]) // Keep dependencies
 
-  const fetchPatients = async () => {
+  const fetchPatients = async (hospitalId) => {
+    // If called from effect without ID, try to get from storage again or use argument
+    let activeId = hospitalId;
+    if (!activeId) {
+       const session = localStorage.getItem('hospital_session')
+       if (session) activeId = JSON.parse(session).id
+    }
+    
+    if (!activeId) return;
+
     setLoading(true)
     setError(null)
     try {
@@ -43,7 +61,8 @@ export default function PatientsDirectory() {
         params: {
           search: debouncedSearch,
           page: pagination.page,
-          limit: pagination.limit
+          limit: pagination.limit,
+          hospital_id: activeId // FILTER APPLIED
         }
       })
       setPatients(data.patients || [])

@@ -79,6 +79,32 @@ const DownloadReportButton = ({ patient, history, alerts, className }) => {
     doc.text(splitSymptoms, 40, yPos);
     yPos += (splitSymptoms.length * 5) + 5;
 
+    // --- VISUAL INJURY ANALYSIS (Dynamic) ---
+    // Check various places where injury_score might be stored
+    const injuryScore = patient.injury_score || patient.meta?.injury_score || 0;
+    
+    if (injuryScore > 0) {
+        yPos += 10;
+        doc.setFillColor(239, 68, 68); // Red
+        doc.roundedRect(15, yPos, pageWidth - 30, 25, 2, 2, 'F');
+        
+        doc.setTextColor(255, 255, 255); // White
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text('⚠ VISUAL INJURY ANALYSIS DETECTED', 20, yPos + 8);
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        
+        const severityLabel = injuryScore > 80 ? 'CRITICAL - MASSIVE HEMORRHAGE' : 
+                              injuryScore > 50 ? 'SEVERE - DEEP LACERATION' : 'MODERATE - SURFACE TRAUMA';
+                              
+        doc.text(`Severity Score: ${injuryScore}/100`, 20, yPos + 18);
+        doc.text(`Classification: ${severityLabel}`, 80, yPos + 18);
+        
+        yPos += 35;
+    }
+
     if (patient.custom_symptoms) {
         doc.setFont('helvetica', 'bold');
         doc.text('Notes:', 15, yPos);

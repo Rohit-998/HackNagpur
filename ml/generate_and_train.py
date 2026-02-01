@@ -15,7 +15,7 @@ print("Features: age, hr, sbp, spo2, temp, rr, chest_pain, breathless, comorbid"
 print()
 
 rows = []
-for _ in range(4000):
+for _ in range(5000):
     age = random.randint(1, 90)
     hr = random.randint(50, 170)
     sbp = random.randint(70, 180)
@@ -47,7 +47,16 @@ for _ in range(4000):
     breathless = 1 if random.random() < 0.12 else 0
     comorbid = 0 if random.random() < 0.7 else (1 if random.random() < 0.8 else 2)
 
-    # Enhanced label heuristic - includes temp and RR
+    # Injury Score (0-100): Usually 0, but sometimes high
+    injury_rand = random.random()
+    if injury_rand < 0.85:
+        injury_score = 0
+    elif injury_rand < 0.95:
+        injury_score = random.randint(10, 40) # Minor
+    else:
+        injury_score = random.randint(50, 100) # Severe
+
+    # Enhanced label heuristic - includes injury score
     high_priority = 1 if (
         chest_pain == 1 or 
         breathless == 1 or 
@@ -60,15 +69,19 @@ for _ in range(4000):
         temp > 38.5 or  # High fever
         temp < 36.0 or  # Hypothermia
         rr > 24 or      # Tachypnea
-        rr < 10         # Bradypnea
+        rr < 10 or      # Bradypnea
+        injury_score > 40 # Significant visible injury
     ) else 0
 
-    rows.append([age, hr, sbp, spo2, temp, rr, chest_pain, breathless, comorbid, high_priority])
+    rows.append([age, hr, sbp, spo2, temp, rr, chest_pain, breathless, comorbid, injury_score, high_priority])
 
-cols = ['age', 'hr', 'sbp', 'spo2', 'temp', 'rr', 'chest_pain', 'breathless', 'comorbid', 'label']
+cols = ['age', 'hr', 'sbp', 'spo2', 'temp', 'rr', 'chest_pain', 'breathless', 'comorbid', 'injury_score', 'label']
 df = pd.DataFrame(rows, columns=cols)
 
-print(f"✓ Generated {len(df)} samples")
+# Save to CSV as requested
+df.to_csv('data_for_ml.csv', index=False)
+print(f"✓ Saved {len(df)} samples to 'data_for_ml.csv'")
+
 print(f"✓ High priority cases: {df['label'].sum()} ({df['label'].sum()/len(df)*100:.1f}%)")
 print()
 

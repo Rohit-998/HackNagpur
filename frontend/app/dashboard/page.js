@@ -8,11 +8,21 @@ import { Activity, FolderOpen, Bot, AlertCircle, FileText, Bell, Siren, Monitor,
 import { AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, Legend, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import VitalsRecheckModal from '@/components/VitalsRecheckModal'
 
+import { useRouter } from 'next/navigation'
+import ReferralModal from '@/components/ReferralModal'
+import CCTVModal from '@/components/CCTVModal'
+
 export default function DashboardPage() {
+  const router = useRouter()
+  const [hospital, setHospital] = useState(null)
+  const [showReferralModal, setShowReferralModal] = useState(false)
+  const [showCCTVModal, setShowCCTVModal] = useState(false)
+  const [incomingReferral, setIncomingReferral] = useState(null)
   const [queue, setQueue] = useState([])
   const [stats, setStats] = useState({})
   const [analytics, setAnalytics] = useState(null)
   const [alerts, setAlerts] = useState([])
+  const [network, setNetwork] = useState([])
   const [loading, setLoading] = useState(true)
   const [pagination, setPagination] = useState({ page: 1, total_pages: 1 })
   const pageRef = useRef(1)
@@ -24,7 +34,10 @@ export default function DashboardPage() {
   const fetchQueue = async () => {
     try {
       const response = await axios.get(`${API_URL}/api/queue`, {
-         params: { page: pageRef.current }
+         params: { 
+           page: pageRef.current,
+           hospital_id: hospital?.id 
+         }
       })
       setQueue(response.data.patients || [])
       setStats(response.data.stats || {})
@@ -46,7 +59,9 @@ export default function DashboardPage() {
 
   const fetchAlerts = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/alerts/active`)
+      const response = await axios.get(`${API_URL}/api/alerts/active`, {
+        params: { hospital_id: hospital?.id }
+      })
       setAlerts(response.data || [])
     } catch (error) {
       console.error('Failed to fetch alerts:', error)
@@ -55,18 +70,59 @@ export default function DashboardPage() {
 
   const fetchAnalytics = async () => {
     try {
-      const { data } = await axios.get(`${API_URL}/api/analytics`)
+      const { data } = await axios.get(`${API_URL}/api/analytics`, {
+         params: { hospital_id: hospital?.id }
+      })
       setAnalytics(data)
     } catch (e) {
       console.error('Analytics fetch error', e)
     }
   }
 
+  const fetchNetwork = async () => {
+    try {
+      const { data } = await axios.get(`${API_URL}/api/network`)
+      setNetwork(data)
+    } catch (e) {
+      console.error('Network fetch error', e)
+    }
+  }
+
+  const triggerDistressSignal = async () => {
+    try {
+      await axios.post(`${API_URL}/api/distress`, {
+        zone: 'Waiting Room A',
+        signal_type: 'collapse',
+        confidence: 0.95,
+        hospital_id: hospital?.id || 1
+      })
+      // Alert will come via socket
+    } catch (e) {
+      console.error('Distress trigger error', e)
+    }
+  }
+
   useEffect(() => {
-    fetchQueue()
-    fetchAlerts()
-    fetchAnalytics()
+    // Check Session
+    const session = localStorage.getItem('hospital_session')
+    if (!session) {
+      router.push('/login')
+      return
+    }
+    const sessionData = JSON.parse(session)
+    setHospital(sessionData)
+
+    // Initial Fetch (will depend on hospital state in next render, but we can rely on effect dependency)
   }, [])
+
+  useEffect(() => {
+    if (hospital) {
+      fetchQueue()
+      fetchAlerts()
+      fetchAnalytics()
+      fetchNetwork()
+    }
+  }, [hospital])
 
   useEffect(() => {
     if (!socket) return
@@ -77,14 +133,44 @@ export default function DashboardPage() {
     })
 
     socket.on('alert:raised', (alert) => {
+      // Filter alerts: If alert has hospital_id, it MUST match mine. 
+      // If it has no ID (legacy), we show it (fall back).
+      if (alert.hospital_id && hospital && alert.hospital_id !== hospital.id) return;
+      
+      // const audio = new Audio('/alert.mp3') // Placeholder sound
+      // audio.play().catch(e => console.log('Audio blocked'))
+
       setAlerts(prev => [alert, ...prev].slice(0, 10))
+    })
+
+    socket.on('referral:incoming', (data) => {
+      // Only show if it's for ME
+      if (hospital && data.to_hospital_id === hospital.id) {
+        setIncomingReferral(data.referral)
+        // Play sound
+        // const audio = new Audio('/alert_classic.mp3') // Placeholder
+        // audio.play().catch(e => console.log('Audio blocked'))
+      }
+    })
+
+    socket.on('queue:update', (data) => {
+       if (data.hospital_id && hospital && data.hospital_id !== hospital.id) return // Ignore updates for other hospitals
+       fetchQueue()
+       fetchAlerts()
+    })
+
+    socket.on('alert:created', (data) => {
+       if (data.hospital_id && hospital && data.hospital_id !== hospital.id) return
+       fetchAlerts()
     })
 
     return () => {
       socket.off('queue:update')
       socket.off('alert:raised')
+      socket.off('referral:incoming')
+      socket.off('alert:created')
     }
-  }, [socket])
+  }, [socket, hospital])
 
   const handleStatusChange = async (patientId, newStatus) => {
     try {
@@ -137,9 +223,11 @@ export default function DashboardPage() {
                 <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
                 {connected ? 'System Online' : 'Reconnect Required'}
               </div>
-              <span className="text-slate-500 text-xs font-mono">WS_LATENCY: 12ms</span>
+              <span className="text-slate-500 text-xs font-mono">ID: {hospital?.id} · {hospital?.role}</span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-display font-bold text-white tracking-tight">Command Center</h1>
+            <h1 className="text-2xl md:text-3xl font-display font-bold text-white tracking-tight">
+              {hospital ? hospital.name : 'Command Center'}
+            </h1>
           </div>
           <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
             <Link href="/" className="px-3 md:px-4 py-2 glass-panel hover:bg-white/5 rounded-lg text-sm text-slate-300 transition-colors whitespace-nowrap">
@@ -157,6 +245,18 @@ export default function DashboardPage() {
             <Link href="/checkin" className="btn-primary flex items-center gap-2 px-3 md:px-4 py-2 text-sm whitespace-nowrap">
               <span className="text-lg">+</span> <span className="hidden sm:inline">Intake</span>
             </Link>
+            <button 
+               onClick={() => {
+                 if (confirm('Disconnect secure session?')) {
+                   localStorage.removeItem('hospital_session')
+                   router.push('/login')
+                 }
+               }}
+               className="p-2 glass-panel hover:bg-red-500/10 hover:border-red-500/20 rounded-lg text-slate-400 hover:text-red-400 transition-all"
+               title="Secure Logout"
+            >
+              <LogOut size={18} />
+            </button>
           </div>
         </div>
 
@@ -274,6 +374,12 @@ export default function DashboardPage() {
                         badge.border
                       } ${patient.triage_score >= 85 ? 'shadow-[0_0_20px_rgba(239,68,68,0.15)]' : ''}`}
                     >
+                      {/* Redirection Suggestion (Smart City Feature) */}
+                      {getWaitTime(patient.arrival_ts) > 45 && network.some(h => h.status === 'optimal' && h.wait_time_min < 30) && (
+                        <div className="absolute -top-3 right-4 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg flex items-center gap-1 animate-bounce cursor-help" title="City-wide load balancing recommended">
+                          <ArrowRight size={10} /> REDIRECT SUGGESTED
+                        </div>
+                      )}
                       {/* Score Strip */}
                       <div className={`p-4 md:w-24 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-white/5 ${badge.bg_soft}`}>
                         <span className={`text-3xl font-display font-bold ${getScoreColor(patient.triage_score)}`}>
@@ -331,6 +437,14 @@ export default function DashboardPage() {
                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                            </svg>
                            Monitor
+                         </button>
+                         <button
+                            onClick={() => { setSelectedPatient(patient); setShowReferralModal(true); }}
+                            className="px-4 py-3 md:py-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-xs font-bold uppercase tracking-wider rounded border border-purple-500/20 transition-all w-full md:w-auto md:flex-[0.5] flex items-center justify-center gap-2"
+                            title="City-wide Transfer"
+                         >
+                           <ArrowRight size={16} />
+                           Refer
                          </button>
                          <button
                             onClick={() => handleStatusChange(patient.id, 'in_treatment')}
@@ -394,26 +508,43 @@ export default function DashboardPage() {
                 ) : (
                   alerts.map((alert, idx) => (
                     <div key={idx} className={`border-l-2 p-3 rounded-r-lg ${
+                      alert.alert_type === 'distress_signal' ? 'bg-purple-500/10 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.15)]' :
                       alert.alert_type === 'deteriorating' ? 'bg-orange-500/5 border-orange-500' :
                       alert.alert_type === 'critical_vitals' ? 'bg-red-500/5 border-red-500' :
                       'bg-red-500/5 border-red-500'
                     }`}>
                       <div className="flex justify-between items-start mb-1">
-                        <span className={`text-xs font-bold uppercase ${
+                        <span className={`text-xs font-bold uppercase flex items-center gap-2 ${
+                          alert.alert_type === 'distress_signal' ? 'text-purple-400' :
                           alert.alert_type === 'deteriorating' ? 'text-orange-400' : 'text-red-400'
                         }`}>
+                          {alert.alert_type === 'distress_signal' && <Siren size={12} className="animate-pulse" />}
                           {alert.alert_type === 'critical_patient' ? 'Critical Triage' :
                            alert.alert_type === 'critical_vitals' ? 'Critical Vitals' :
                            alert.alert_type === 'deteriorating' ? 'Deteriorating' :
+                           alert.alert_type === 'distress_signal' ? 'CCTV DISTRESS' :
                            'Alert'}
                         </span>
                         <span suppressHydrationWarning className="text-[10px] text-slate-600 font-mono">{new Date(alert.timestamp || alert.created_at).toLocaleTimeString()}</span>
                       </div>
-                      <p className="text-xs text-slate-300">
-                        Patient <span className="font-mono font-bold text-white">
-                          {alert.full_name || alert.payload?.full_name || '#' + alert.patient_id}
-                        </span> <span className="text-slate-500">·</span> Score {alert.triage_score || alert.new_score || alert.payload?.triage_score || alert.payload?.new_score || 'N/A'}
-                      </p>
+                      <div className="text-xs text-slate-300">
+                        {alert.alert_type === 'distress_signal' ? (
+                           <div className="flex flex-col gap-0.5">
+                             <div className="flex items-center gap-2 text-white font-bold text-[10px] tracking-wider">
+                               <span>📍 {alert.zone || alert.payload?.zone || 'Waiting Room A'}</span>
+                               <span className="text-slate-600">|</span>
+                               <span>UNK. PERSON</span>
+                             </div>
+                             <span className="text-purple-300 font-mono text-[10px]">{alert.message || alert.payload?.message}</span>
+                           </div>
+                        ) : (
+                           <>
+                           Patient <span className="font-mono font-bold text-white">
+                             {alert.full_name || alert.payload?.full_name || '#' + alert.patient_id}
+                           </span> <span className="text-slate-500">·</span> Score {alert.triage_score || alert.new_score || alert.payload?.triage_score || alert.payload?.new_score || 'N/A'}
+                           </>
+                        )}
+                      </div>
                     </div>
                   ))
                 )}
@@ -452,7 +583,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Quick Actions */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 mb-6">
               <Link href="/checkin" className="glass-panel p-4 rounded-xl hover:bg-white/5 transition-all text-center group">
                 <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">📝</div>
                 <div className="text-xs font-bold text-slate-300">New Intake</div>
@@ -461,6 +592,51 @@ export default function DashboardPage() {
                 <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">⚙️</div>
                 <div className="text-xs font-bold text-slate-300">Config</div>
               </Link>
+            </div>
+
+            {/* City Network Status (New City-Scale Feature) */}
+            <div className="glass-panel rounded-xl p-0 overflow-hidden">
+              <div className="p-4 border-b border-white/5 bg-slate-900/50 flex justify-between items-center">
+                <h3 className="font-bold text-white flex items-center gap-2 text-sm">
+                  <Monitor size={16} className="text-blue-400" />
+                  City Network
+                </h3>
+                <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 animate-pulse">LIVE</span>
+              </div>
+              <div className="p-4 space-y-3">
+                {network.length === 0 ? (
+                  <p className="text-xs text-slate-600 font-mono text-center">OFFLINE</p>
+                ) : (
+                  network.map((hosp, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${
+                          hosp.status === 'optimal' ? 'bg-emerald-500' :
+                          hosp.status === 'busy' ? 'bg-amber-500' :
+                          'bg-red-500'
+                        }`}></div>
+                        <span className="text-slate-300">{hosp.name}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className={`font-mono font-bold ${
+                           hosp.status === 'optimal' ? 'text-emerald-400' :
+                           hosp.status === 'busy' ? 'text-amber-400' :
+                           'text-red-400'
+                        }`}>{hosp.load_percentage}%</div>
+                        <div className="text-[10px] text-slate-500">{hosp.wait_time_min}m wait</div>
+                      </div>
+                    </div>
+                  ))
+                )}
+                <div className="pt-3 border-t border-white/5 mt-2">
+                   <button 
+                     onClick={() => setShowCCTVModal(true)}
+                     className="w-full py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+                   >
+                     <Siren size={12} /> Simulate CCTV Distress
+                   </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -472,6 +648,72 @@ export default function DashboardPage() {
           onClose={() => setSelectedPatient(null)}
           onUpdate={fetchQueue}
         />
+      )}
+      {/* Referral Modal (Sender) */}
+      {showReferralModal && selectedPatient && (
+        <ReferralModal
+           patient={selectedPatient}
+           currentHospital={hospital}
+           network={network}
+           onClose={() => { setShowReferralModal(false); setSelectedPatient(null); }}
+           onSuccess={() => { fetchQueue(); setShowReferralModal(false); setSelectedPatient(null); }}
+        />
+      )}
+
+      {/* CCTV Modal */}
+      {showCCTVModal && (
+        <CCTVModal 
+           onClose={() => setShowCCTVModal(false)}
+           hospitalId={hospital?.id}
+        />
+      )}
+
+      {/* Incoming Referral Alert (Receiver) */}
+      {incomingReferral && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+           <div className="glass-panel p-6 max-w-lg w-full rounded-2xl border-l-4 border-l-blue-500 shadow-[0_0_50px_rgba(37,99,235,0.2)] animate-in zoom-in-95 duration-200">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-4">
+                 <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center animate-pulse">
+                    <ArrowRight className="text-white" size={18} />
+                 </div>
+                 Incoming Transfer Request
+              </h2>
+              
+              <div className="bg-white/5 rounded-xl p-4 mb-4 border border-white/5">
+                 <p className="text-xs text-slate-400 uppercase tracking-widest mb-1">Patient</p>
+                 <p className="text-lg font-bold text-white">{incomingReferral.patient.full_name}</p>
+                 <p className="text-sm text-slate-300 mt-1">
+                   {incomingReferral.patient.sex} · {incomingReferral.patient.age}Y · Score {incomingReferral.patient.triage_score}
+                 </p>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-4 mb-6 border border-white/5">
+                 <p className="text-xs text-slate-400 uppercase tracking-widest mb-1">Reason</p>
+                 <p className="text-sm text-slate-200 italic">"{incomingReferral.notes || 'No notes provided'}"</p>
+              </div>
+
+              <div className="flex gap-3">
+                 <button 
+                   onClick={() => setIncomingReferral(null)}
+                   className="flex-1 py-3 rounded-lg border border-white/10 hover:bg-white/5 text-slate-300 font-bold"
+                 >
+                   Defer
+                 </button>
+                 <button 
+                   onClick={async () => {
+                      try {
+                        await axios.post(`${API_URL}/api/referrals/${incomingReferral.id}/accept`)
+                        setIncomingReferral(null)
+                        fetchQueue()
+                      } catch(e) { console.error(e) }
+                   }}
+                   className="flex-1 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-lg shadow-blue-500/25"
+                 >
+                   Accept Transfer
+                 </button>
+              </div>
+           </div>
+        </div>
       )}
     </main>
   )
